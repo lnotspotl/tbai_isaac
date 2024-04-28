@@ -1,2 +1,9 @@
-logs/
 __pycache__/
+
+*.egg-info/
+*.egg
+
+.mypy_cache/
+.ruff_cache/
+
+logs/

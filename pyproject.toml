@@ -1,0 +1,31 @@
+[project]
+name="tbai_isaac"
+version="0.0.1"
+requires-python = ">=3.8"
+dependencies = [
+    "lxml"
+]
+
+[options]
+package_dir="src"
+
+[project.optional-dependencies]
+dev = [
+    "mypy",
+    "ruff",
+    "pytest",
+]
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+# Development
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+extend-select = ["E501"]
+
+[tool.pytest.ini_options]
+addopts = "--ignore=dependencies"   
