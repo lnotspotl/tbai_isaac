@@ -23,9 +23,23 @@ build-backend = "setuptools.build_meta"
 # Development
 [tool.ruff]
 line-length = 120
+indent-width = 4
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"
 
 [tool.ruff.lint]
-extend-select = ["E501"]
+extend-select = ["I001", "E501"]
+
+# isort rules:
+# I001: unsorted-imports
+
+# pycodestyle rules:
+# E501: line-too-long
+
+# All rules available at: https://docs.astral.sh/ruff/rules/
 
 [tool.pytest.ini_options]
 addopts = "--ignore=dependencies"   
