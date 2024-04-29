@@ -5,6 +5,7 @@ import time
 
 import pytest
 from tbai_isaac.common.config import YamlConfig
+from tbai_isaac.common.config import load_config, store_config, select
 
 TEST_CONFIG = f"test_config_{time.time()}.yaml"
 
@@ -136,3 +137,19 @@ def test_store():
     config2 = YamlConfig(path)
     assert config.as_dict() == config2.as_dict()
     os.remove(path)
+
+
+def test_config_new():
+    cfg = load_config(TEST_CONFIG)
+    assert cfg.model.name == "test_model"
+    assert cfg.model.version == 1
+
+
+def test_config_new2():
+    cfg = load_config(TEST_CONFIG, "model")
+    assert cfg.name == "test_model"
+
+
+def test_config_new3():
+    with pytest.raises(AssertionError):
+        load_config(TEST_CONFIG + ".json")

@@ -2,7 +2,6 @@
 
 from torch.utils.tensorboard import SummaryWriter
 
-from ABC import ABC, abstractmethod
 
 class AbstractWriter(SummaryWriter):
     def __init__(self, *args, **kwargs):
@@ -11,12 +10,14 @@ class AbstractWriter(SummaryWriter):
     def upload(self):
         raise NotImplementedError
 
+
 class TensorboardWriter(AbstractWriter):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
     def upload(self):
         pass
+
 
 class WandbWriter(AbstractWriter):
     def __init__(self, project_name):
@@ -35,6 +36,7 @@ class WandbWriter(AbstractWriter):
     def upload(self):
         self.wandb.log(self.data, step=int(self.step))
         self.data = {}
+
 
 class WandbWriter(SummaryWriter):
     def __init__(self, project_name):
