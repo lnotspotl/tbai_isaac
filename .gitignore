@@ -5,5 +5,7 @@ __pycache__/
 
 .mypy_cache/
 .ruff_cache/
+*.so
 
 logs/
+wandb/
