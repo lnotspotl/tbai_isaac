@@ -13,3 +13,4 @@ wandb/
 # container
 isaacgym/
 tbai_bindings/
+tbai_isaac.sif
