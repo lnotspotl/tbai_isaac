@@ -9,3 +9,7 @@ __pycache__/
 
 logs/
 wandb/
+
+# container
+isaacgym/
+tbai_bindings/
