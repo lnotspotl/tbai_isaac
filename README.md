@@ -6,7 +6,7 @@ You should install [Isaac Gym](https://developer.nvidia.com/isaac-gym) prior to 
 
 ## Cloning project
 ```bash
-git clone git@github.com:projectatctu/tbai_isaac.git --recursive
+git clone git@github.com:projectatctu/tbai_isaac.git
 ```
 
 ## Installing project
