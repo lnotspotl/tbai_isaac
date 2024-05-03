@@ -1,16 +1,17 @@
 #!/usr/bin/env bash
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+ISAACGYM_DIR="$SCRIPT_DIR/isaacgym"
+TBAIBINDINGS_DIR="$SCRIPT_DIR/tbai_bindings"
+TBAIISAAC_DIR="$SCRIPT_DIR/../"
 
 if [[ -z $1 ]]; then
-  echo "Usage: ./helper.bash [--build_docker|--build_singularity|--run_docker|--run_singularity|--install_docker|--install_singularity]"
+  echo "Usage: ./helper.bash [--build_docker|--build_singularity|--run_docker|--run_singularity|--install_docker|--install_singularity|--pack_singuarity]"
   exit
 fi
 
 
 if [[ $1 == "--build_docker" ]]; then
-  ISAACGYM_DIR="$SCRIPT_DIR/isaacgym"
-  TBAIBINDINGS_DIR="$SCRIPT_DIR/tbai_bindings"
 
   if [ ! -d $ISAACGYM_DIR ]; then
     echo "Put your isaacgym copy into this folder. It should be located at $ISAACGYM_DIR"
@@ -45,9 +46,18 @@ if [[ $1 == "--run_docker" ]]; then
 fi
 
 if [[ $1 == "--run_singularity" ]]; then
+  mkdir -p ./tmp
+  mkdir -p ./wormhole
+
   SINGULARITYIMAGE_NAME="tbai_isaac.sif"
-  singularity exec --nv --writable --no-home --containall $SINGULARITYIMAGE_NAME bash
+  singularity exec --nv --writable --no-home --containall \
+  --bind ..:/home/tbai/tbai_isaac/ \
+  --bind ./tmp:/tmp \
+  --bind ./wormhole:/wormhole \
+   $SINGULARITYIMAGE_NAME bash
   # --nv ... gives access to nvidia gpus
+
+  rm -rf ./tmp
 fi
 
 if [[ $1 == "--install_docker" ]]; then 
@@ -74,8 +84,8 @@ fi
 
 if [[ $1 == "--install_singularity" ]]; then
   # Download singularity deb package
-  NAME=apptainer_1.3.0.rc.2_amd64.deb
-  wget https://github.com/sylabs/singularity/releases/download/v3.10.5/${NAME}
+  NAME=apptainer_1.3.0_amd64.deb
+  wget https://github.com/apptainer/apptainer/releases/download/v1.3.0/${NAME}
 
   # Install singularity
   sudo apt install ./${NAME}
@@ -85,4 +95,31 @@ if [[ $1 == "--install_singularity" ]]; then
 
   # Clean up
   rm ${NAME}
+fi
+
+if [[ $1 == "--pack_singularity" ]]; then
+  tar -cf tbai_isaac.tar.gz tbai_isaac.sif # Tar without compression - faster
+fi
+
+if [[ $1 == "--unpack_singularity" ]]; then
+  tar -xf tbai_isaac.tar.gz
+fi
+
+if [[ $1 == "--pack_builder" ]]; then
+  if [ ! -d $ISAACGYM_DIR ]; then
+    echo "Put your isaacgym copy into this folder. It should be located at $ISAACGYM_DIR"
+    exit
+  fi
+
+  if [ ! -d $TBAIBINDINGS_DIR ]; then
+    echo "Put your tbai_bindings copy into this folder. It should be located at $TBAIBINDINGS_DIR"
+    exit
+  fi
+
+  if [ -d tbai_isaac.sif ]; then
+    echo "tbai_isaac.sif already exists. Remove it first."
+    exit
+  fi
+
+  tar -cf tbai_isaac.tar.gz ${TBAIISAAC_DIR}
 fi

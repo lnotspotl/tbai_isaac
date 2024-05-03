@@ -23,6 +23,7 @@ def parse_args():
             "name": "--max_iterations",
             "type": int,
             "help": "Maximum number of training iterations. Overrides config file if provided.",
+            "default": 1500
         },
         {
             "name": "--seed",
@@ -45,6 +46,13 @@ def parse_args():
             "type": str,
             "help": "Path to the model file.",
         },
+        {
+            "name": "--writer_type",
+            "type": str,
+            "default": "none",
+            "options": ["wandb", "tensorboard", "none"],
+            "help": "Writer type for logging.",
+        }
     ]
 
     # parse arguments
@@ -77,3 +85,6 @@ def store_config(args, config):
     log_dir = args.log_dir
     config_file = os.path.join(log_dir, "config.yaml")
     ac.store_config(config, config_file)
+
+def create_dir(dir):
+    os.makedirs(dir, exist_ok=True)

@@ -14,7 +14,7 @@ RUN apt install python3 python3-pip -y
 # Install torch
 RUN pip3 --no-cache-dir install networkx==3.1  # This is because otherwise torch installs the newest networx version which only supports python >=3.10
 RUN pip3 install --no-cache-dir torch==2.0.1 --index-url https://download.pytorch.org/whl/cu118
-RUN pip3 install --no-cache-dir numpy wandb
+RUN pip3 install --no-cache-dir numpy wandb tensorboard numpy==1.20.3
 
 # Install ROS
 RUN echo "deb http://packages.ros.org/ros/ubuntu focal main" > /etc/apt/sources.list.d/ros-latest.list
@@ -54,6 +54,7 @@ RUN source ${HOME}/.bashrc && cd ${HOME}/tbai_bindings && source /opt/ros/noetic
 
 # Source tbai_bindings
 RUN echo "source ${HOME}/tbai_bindings/devel/setup.bash" >> ${HOME}/.bashrc && source ${HOME}/.bashrc
+RUN echo "export HOME=${HOME}" >> ${HOME}/.bashrc && source ${HOME}/.bashrc
 
 # Placeholders for singularity
 RUN touch /bin/nvidia-smi && \
@@ -64,6 +65,10 @@ RUN touch /bin/nvidia-smi && \
     touch /etc/localtime && \
     mkdir -p /var/run/nvidia-persistenced && \
     touch /var/run/nvidia-persistenced/socket
+
+# FOLDERS for 
+RUN mkdir -p ${HOME}/tmp # temporary folder
+RUN mkdir -p ${HOME}/wormhole # persistent folder
 
 # Set initial working directory
 WORKDIR ${HOME}

@@ -12,9 +12,10 @@ from .algorithm import PPO
 
 
 class Coach:
-    def __init__(self, env, train_cfg, ac, log_dir, device="cpu", writer_type="tensorboard"):
+    def __init__(self, env, train_cfg, ac, log_dir, writer_type="tensorboard"):
         self.cfg = train_cfg["runner"]
         self.alg_cfg = train_cfg["algorithm"]
+        device = "cuda"
         self.device = device
         self.env = env
         self.alg: PPO = PPO(ac, device=self.device, **self.alg_cfg)
@@ -104,7 +105,7 @@ class Coach:
             if self.log_dir is not None:
                 self.log(locals())
             if it % self.save_interval == 0:
-                self.save(os.path.join(self.log_dir, "model_{}.pt".format(it)))
+                self.save(os.path.join(self.log_dir, "model_{}.pt".format(it)), rewbuffer)
             ep_infos.clear()
 
         self.current_learning_iteration += num_learning_iterations
@@ -186,8 +187,8 @@ class Coach:
         )
         print(log_string)
 
-    def save(self, path, infos=None):
-        self.logger.info(f"Saving model to {path}. Mean reward: {statistics.mean(self.rewbuffer):.3f}")
+    def save(self, path, rewbuffer, infos=None):
+        self.logger.info(f"Saving model to {path}. Mean reward: {statistics.mean(rewbuffer):.3f}")
         torch.save(
             {
                 "model_state_dict": self.alg.actor_critic.state_dict(),
