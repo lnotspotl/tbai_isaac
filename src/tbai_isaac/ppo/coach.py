@@ -8,28 +8,10 @@ from torch.utils.tensorboard import SummaryWriter
 
 from .algorithm import PPO
 
-
-# Provisionary wandb writer
-class WandbWriter(SummaryWriter):
-    def __init__(self, project_name):
-        import wandb
-
-        wandb.init(project=project_name)
-        self.wandb = wandb
-
-        self.data = {}
-
-    def add_scalar(self, name, value, step):
-        self.step = int(step)
-        self.data[name] = value
-
-    def upload(self):
-        self.wandb.log(self.data, step=int(self.step))
-        self.data = {}
-
+from tbai_isaac.common.writers import Writer
 
 class Coach:
-    def __init__(self, env, train_cfg, ac, log_dir=None, device="cpu", writer="tensorboard"):
+    def __init__(self, env, train_cfg, ac, log_dir=None, device="cpu", writer_type="tensorboard"):
         self.cfg = train_cfg["runner"]
         self.alg_cfg = train_cfg["algorithm"]
         self.device = device
@@ -49,13 +31,7 @@ class Coach:
 
         # Log
         self.log_dir = log_dir
-
-        if writer == "tensorboard":
-            self.writer = SummaryWriter(log_dir=self.log_dir, flush_secs=10)
-        elif writer == "wandb":
-            self.writer = WandbWriter(project_name="dtc")
-        else:
-            raise ValueError(f"Unknown writer {writer}")
+        self.writer = Writer(type=writer_type)
 
         self.tot_timesteps = 0
         self.tot_time = 0
@@ -166,9 +142,6 @@ class Coach:
             self.writer.add_scalar("Train/mean_episode_length", statistics.mean(locs["lenbuffer"]), locs["it"])
             self.writer.add_scalar("Train/mean_reward/time", statistics.mean(locs["rewbuffer"]), self.tot_time)
             self.writer.add_scalar("Train/mean_episode_length/time", statistics.mean(locs["lenbuffer"]), self.tot_time)
-
-        if isinstance(self.writer, WandbWriter):
-            self.writer.upload()
 
         str = f" \033[1m Learning iteration {locs['it']}/{self.current_learning_iteration + locs['num_learning_iterations']} \033[0m "
 

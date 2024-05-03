@@ -1,56 +1,31 @@
 #!/usr/bin/env python3
 
-from torch.utils.tensorboard import SummaryWriter
+class Writer:
+    def __init__(self, type):
+        assert type in ["tensorboard", "wandb", "none"], f"Invalid writer type: {type}"
+        self.type = type
 
+        if self.type == "tensorboard":
+            from torch.utils.tensorboard import SummaryWriter
+            self.writer = SummaryWriter
 
-class AbstractWriter(SummaryWriter):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+        if self.type == "wandb":
+            import wandb
+            self.wandb = wandb
+            self.buffer = dict() 
 
-    def upload(self):
-        raise NotImplementedError
+        self.step = -1
 
+    def add_scalar(self, tag: str, value: float, global_step: int):
+        if self.type == "tensorboard":
+            self.writer.add_scalar(tag, value, global_step)
 
-class TensorboardWriter(AbstractWriter):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-    def upload(self):
-        pass
-
-
-class WandbWriter(AbstractWriter):
-    def __init__(self, project_name):
-        super().__init__()
-        import wandb
-
-        wandb.init(project=project_name)
-        self.wandb = wandb
-
-        self.data = {}
-
-    def add_scalar(self, name, value, step):
-        self.step = int(step)
-        self.data[name] = value
-
-    def upload(self):
-        self.wandb.log(self.data, step=int(self.step))
-        self.data = {}
-
-
-class WandbWriter(SummaryWriter):
-    def __init__(self, project_name):
-        import wandb
-
-        wandb.init(project=project_name)
-        self.wandb = wandb
-
-        self.data = {}
-
-    def add_scalar(self, name, value, step):
-        self.step = int(step)
-        self.data[name] = value
-
-    def upload(self):
-        self.wandb.log(self.data, step=int(self.step))
-        self.data = {}
+        if self.type == "wandb":
+            if self.step < global_step and len(self.buffer) > 0:
+                self.wandb.log(self.buffer, step=self.step)
+                self.buffer = dict()
+            self.buffer[tag] = value
+            self.step = global_step
+        
+        if self.type == "none":
+            pass  # do nothing
