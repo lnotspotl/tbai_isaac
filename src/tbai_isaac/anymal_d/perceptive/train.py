@@ -3,18 +3,17 @@
 
 from tbai_isaac.anymal_d.perceptive.env import LeggedRobot
 from tbai_isaac.anymal_d.perceptive.teacher import TeacherNetwork
-from tbai_isaac.common.args import parse_args
+from tbai_isaac.common.config import load_config
+from tbai_isaac.common.utils import parse_args
 from tbai_isaac.ppo.coach import Coach
-
-from tbai_isaac.common.config import load_config, select
 
 
 def train(args):
-    config = load_config("./config.yaml")
+    config = load_config(args.config)
     if args.max_iterations is None:
         args.max_iterations = config["ppo/runner/max_iterations"]
 
-    env = LeggedRobot(config, args.rl_device, args.headless)
+    env = LeggedRobot(config, args.headless)
 
     actor_critic = TeacherNetwork(config)
 

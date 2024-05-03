@@ -4,14 +4,13 @@ import torch
 import torch.nn as nn
 from tbai_isaac.anymal_d.dtc.agent import AgentNetwork
 from tbai_isaac.anymal_d.dtc.env import LeggedRobot
-from tbai_isaac.common.args import parse_args
+from tbai_isaac.common.config import load_config
+from tbai_isaac.common.utils import parse_args
 from tbai_isaac.ppo.coach import Coach
 
 
-from tbai_isaac.common.config import load_config, select
-
 def train(args):
-    config = load_config("./config.yaml")
+    config = load_config(args.config)
 
     config.environment.env.num_envs = min(config.environment.env.num_envs, 5)
     config.environment.terrain.num_rows = 5
@@ -23,7 +22,7 @@ def train(args):
     if args.max_iterations is None:
         args.max_iterations = config.ppo.runner.max_iterations
 
-    env = LeggedRobot(config, args.rl_device, args.headless)
+    env = LeggedRobot(config, args.headless)
 
     model_in = "./model.pt"
     model_out = "./model_deploy_jitted.pt"

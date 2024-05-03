@@ -17,7 +17,7 @@ from tbai_isaac.common.terrain import Terrain
 
 
 class LeggedRobot(BaseEnv):
-    def __init__(self, yaml_cfg, sim_device, headless):
+    def __init__(self, yaml_cfg, headless):
         """Parses the provided config file,
             calls create_sim() (which creates, simulation, terrain and environments),
             initilizes pytorch buffers used during training
@@ -65,7 +65,7 @@ class LeggedRobot(BaseEnv):
         if num_privileged_obs is None:
             num_privileged_obs = 0
         num_actions = self.env_config.num_actions
-        device = sim_device
+        device = "cuda"
         num_envs = self.env_config.num_envs
 
         super().__init__(
@@ -77,7 +77,7 @@ class LeggedRobot(BaseEnv):
             num_envs=num_envs,
             sim_params=self.sim_params,
             physics_engine=gymapi.SIM_PHYSX,
-            sim_device=sim_device,
+            sim_device="cuda",
         )
 
         self.ig_interface = get_interface(self.num_envs, torch)

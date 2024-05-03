@@ -4,15 +4,15 @@ import time
 from collections import deque
 
 import torch
-from torch.utils.tensorboard import SummaryWriter
+
+from tbai_isaac.common.logging import get_logger
+from tbai_isaac.common.writers import Writer
 
 from .algorithm import PPO
 
-from tbai_isaac.common.writers import Writer
-from tbai_isaac.common.logging import get_logger
 
 class Coach:
-    def __init__(self, env, train_cfg, ac, log_dir=None, device="cpu", writer_type="tensorboard"):
+    def __init__(self, env, train_cfg, ac, log_dir, device="cpu", writer_type="tensorboard"):
         self.cfg = train_cfg["runner"]
         self.alg_cfg = train_cfg["algorithm"]
         self.device = device
@@ -30,7 +30,10 @@ class Coach:
             [self.env.num_actions],
         )
 
-        self.logger = get_logger("Coach", log_to_stdout=True, log_to_file=True, log_file="./coach.log")
+        assert os.path.exists(log_dir), f"Log directory {log_dir} does not exist"
+
+        log_file = os.path.join(log_dir, "coach.log") if log_dir is not None else None
+        self.logger = get_logger("Coach", log_to_stdout=True, log_to_file=True, log_file=log_file)
 
         # Log
         self.log_dir = log_dir
@@ -184,7 +187,7 @@ class Coach:
         print(log_string)
 
     def save(self, path, infos=None):
-        self.logger.info(f"Saving model to {path}. Mean reward: {statistics.mean(self.rewbuffer)}")
+        self.logger.info(f"Saving model to {path}. Mean reward: {statistics.mean(self.rewbuffer):.3f}")
         torch.save(
             {
                 "model_state_dict": self.alg.actor_critic.state_dict(),

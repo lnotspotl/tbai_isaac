@@ -3,15 +3,14 @@
 import torch
 from tbai_isaac.anymal_d.dtc.agent import AgentNetwork
 from tbai_isaac.anymal_d.dtc.env import LeggedRobot
-from tbai_isaac.common.args import parse_args
+from tbai_isaac.common.config import load_config
+from tbai_isaac.common.utils import parse_args
 from tbai_isaac.ppo.coach import Coach
-
-from tbai_isaac.common.config import load_config, select
 
 
 def train(args):
 
-    config = load_config("./config.yaml")
+    config = load_config(args.config)
     config.environment.env.num_envs = min(config.environment.env.num_envs, 5)
     config.environment.terrain.num_rows = 5
     config.environment.terrain.num_cols = 5
@@ -20,7 +19,7 @@ def train(args):
     config.environment.domain_randomization.randomize_friction = False
     config.environment.domain_randomization.push_robots = False
 
-    env = LeggedRobot(config, args.rl_device, args.headless)
+    env = LeggedRobot(config, args.headless)
 
     model_path = "./w_default_angles.pt"
     model_path = "./w_optimized_angles.pt"

@@ -1,19 +1,17 @@
 #!/usr/bin/env python3
 
-
+import os
 import isaacgym  # noqa: F401
 import torch
 from tbai_isaac.anymal_d.perceptive.env import LeggedRobot
 from tbai_isaac.anymal_d.perceptive.teacher import TeacherNetwork
-from tbai_isaac.common.args import parse_args
+from tbai_isaac.common.config import load_config
+from tbai_isaac.common.utils import parse_args, set_seed, store_config
 from tbai_isaac.ppo.coach import Coach
-
-from tbai_isaac.common.config import load_config, select
 
 
 def train(args):
-
-    config = load_config("./config.yaml")
+    config = load_config(args.config)
     config.environment.env.num_envs = min(config.environment.env.num_envs, 50)
     config.environment.terrain.num_rows = 5
     config.environment.terrain.num_cols = 5
@@ -22,9 +20,20 @@ def train(args):
     config.environment.domain_randomization.randomize_friction = False
     config.environment.domain_randomization.push_robots = False
 
-    env = LeggedRobot(config, args.rl_device, args.headless)
+    # Set seed
+    if "seed" not in config:
+        seed = set_seed(args.seed)
+        config["seed"] = seed
+    else:
+        seed = config["seed"]
+        set_seed(seed)
 
-    model_path = "./logs2/model_1300.pt"
+    store_config(args, config)
+
+    env = LeggedRobot(config, args.headless)
+    assert args.model is not None, "Model must be provided"
+    model_path = os.path.join(args.log_dir, args.model)
+
 
     actor_critic = TeacherNetwork(config)
 

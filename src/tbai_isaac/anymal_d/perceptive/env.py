@@ -4,6 +4,7 @@ import os
 from collections import OrderedDict
 
 import numpy as np
+import tbai_isaac.anymal_d.perceptive.config as ac
 import torch
 from isaacgym import gymapi, gymtorch, gymutil
 from isaacgym.torch_utils import *
@@ -11,17 +12,14 @@ from tbai_isaac.anymal_d.common.central_pattern_generator import CentralPatternG
 from tbai_isaac.anymal_d.common.inverse_kinematics import AnymalInverseKinematics
 from tbai_isaac.anymal_d.info import URDF_FOLDER
 from tbai_isaac.common.base_env import BaseEnv
+from tbai_isaac.common.config import select
 from tbai_isaac.common.math import quat_apply_yaw, wrap_to_pi
 from tbai_isaac.common.observation import ObservationManager
 from tbai_isaac.common.terrain import Terrain
 
-from tbai_isaac.common.config import select
-
-import tbai_isaac.anymal_d.perceptive.config as ac
-
 
 class LeggedRobot(BaseEnv):
-    def __init__(self, yaml_cfg, sim_device, headless):
+    def __init__(self, yaml_cfg, headless):
         """Parses the provided config file,
             calls create_sim() (which creates, simulation, terrain and environments),
             initilizes pytorch buffers used during training
@@ -65,7 +63,7 @@ class LeggedRobot(BaseEnv):
         if num_privileged_obs is None:
             num_privileged_obs = 0
         num_actions = self.env_config.num_actions
-        device = sim_device
+        device = "cuda"
         num_envs = self.env_config.num_envs
 
         super().__init__(
@@ -77,7 +75,7 @@ class LeggedRobot(BaseEnv):
             num_envs=num_envs,
             sim_params=self.sim_params,
             physics_engine=gymapi.SIM_PHYSX,
-            sim_device=sim_device,
+            sim_device="cuda",
         )
 
         print(self.privileged_obs_buf)

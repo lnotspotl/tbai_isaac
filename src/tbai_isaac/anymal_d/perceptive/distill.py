@@ -10,7 +10,7 @@ from tbai_isaac.anymal_d.perceptive.config import
 from tbai_isaac.anymal_d.perceptive.env import LeggedRobot
 from tbai_isaac.anymal_d.perceptive.student import StudentPolicy, StudentPolicyJitted
 from tbai_isaac.anymal_d.perceptive.teacher import TeacherNetwork
-from tbai_isaac.common.args import parse_args
+from tbai_isaac.common.utils import parse_args
 from tbai_isaac.ppo.coach import Coach
 from torch.utils.tensorboard import SummaryWriter
 
@@ -170,14 +170,14 @@ class Distiller:
 
 
 def distill(args):
-    config = load_config("./config.yaml")
+    config = load_config(args.config)
     config.environment.env.num_envs = min(config.environment.env.num_envs, 4096)
     config.environment.terrain.curriculum = False
     config.environment.noise.add_noise = False
     config.environment.domain_randomization.randomize_friction = True
     config.environment.domain_randomization.push_robots = True
 
-    env = LeggedRobot(config, args.rl_device, args.headless)
+    env = LeggedRobot(config, args.headless)
 
     model_path = "./logs/model_3000.pt"
 

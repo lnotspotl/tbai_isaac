@@ -2,10 +2,10 @@
 
 import numpy as np
 from isaacgym import gymapi
-from tbai_isaac.anymal_d.info import URDF_PATH
-
 from omegaconf import OmegaConf
+from tbai_isaac.anymal_d.info import URDF_PATH
 from tbai_isaac.common.config import select
+
 
 def get_asset_options(config: OmegaConf) -> gymapi.AssetOptions:
     asset_options = gymapi.AssetOptions()
