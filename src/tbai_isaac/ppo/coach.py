@@ -35,8 +35,8 @@ class Coach:
         self.device = device
         self.env = env
         self.alg: PPO = PPO(ac, device=self.device, **self.alg_cfg)
-        self.num_steps_per_env = self.cfg["num_steps_per_env"]
-        self.save_interval = self.cfg["save_interval"]
+        self.num_steps_per_env = self.cfg.num_steps_per_env
+        self.save_interval = self.cfg.save_interval
 
         # init storage and model
         self.alg.init_storage(

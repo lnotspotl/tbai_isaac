@@ -15,12 +15,12 @@ class TeacherNetwork(ActorCritic):
 
         self.cfg = cfg
 
-        num_actor_obs = cfg["environment/env/num_observations"]
-        num_critic_obs = cfg["environment/env/num_observations"]
-        activation = cfg["ppo/policy/activation"]
-        actor_hidden_dims = cfg["ppo/policy/actor_hidden_dims"]
-        critic_hidden_dims = cfg["ppo/policy/critic_hidden_dims"]
-        init_noise_std = cfg["ppo/policy/init_noise_std"]
+        num_actor_obs = self.cfg.environment.env.num_observations
+        num_critic_obs = self.cfg.environment.env.num_observations
+        activation = self.cfg.ppo.policy.activation
+        actor_hidden_dims = self.cfg.ppo.policy.actor_hidden_dims
+        critic_hidden_dims = self.cfg.ppo.policy.critic_hidden_dims
+        init_noise_std = self.cfg.ppo.policy.init_noise_std
 
         activation = self.get_activation(activation)
 

@@ -6,7 +6,7 @@ import torch.nn as nn
 import torch.optim as optim
 import tqdm
 from tbai_isaac.anymal_d.common.noise_model import ExteroceptiveNoiseGenerator
-from tbai_isaac.anymal_d.perceptive.config import AnymalConfig
+from tbai_isaac.anymal_d.perceptive.config import 
 from tbai_isaac.anymal_d.perceptive.env import LeggedRobot
 from tbai_isaac.anymal_d.perceptive.student import StudentPolicy, StudentPolicyJitted
 from tbai_isaac.anymal_d.perceptive.teacher import TeacherNetwork
@@ -14,9 +14,12 @@ from tbai_isaac.common.args import parse_args
 from tbai_isaac.ppo.coach import Coach
 from torch.utils.tensorboard import SummaryWriter
 
+from tbai_isaac.common.config import load_config, select
+from tbai_isaac.anymal_d.perceptive.config import ac
+
 
 class Distiller:
-    def __init__(self, config: AnymalConfig, teacher, student, env, n_iters, headless, device, logs_dir=None):
+    def __init__(self, config, teacher, student, env, n_iters, headless, device, logs_dir=None):
         self.config = config
         self.teacher = teacher
         self.teacher_policy = teacher.act_inference
@@ -26,8 +29,8 @@ class Distiller:
         self.n_iters = n_iters
         self.headless = headless
 
-        self.noise_config = self.config.get_noise_config()
-        self.normalization_config = self.config.get_normalization_config()
+        self.noise_config = ac.get_noise_config(self.config)
+        self.normalization_config = ac.get_normalization_config(self.config)
 
         self.start_lr = 3e-3
         self.end_lr = 1e-9
@@ -55,7 +58,7 @@ class Distiller:
 
         self.exteroceptive_noise_generator = ExteroceptiveNoiseGenerator(
             points_per_leg=52,
-            n_envs=self.config["environment/env/num_envs"],
+            n_envs=self.config.environment.env.num_envs,
             env_max_steps=self.env.max_episode_length,
             n_legs=4,
         )
@@ -167,30 +170,29 @@ class Distiller:
 
 
 def distill(args):
-    config = AnymalConfig("./config.yaml")
-    config["environment/env/num_envs"] = min(config["environment/env/num_envs"], 4096)
-    config["environment/terrain/curriculum"] = False
-    config["environment/noise/add_noise"] = False
-    config["environment/domain_randomization/randomize_friction"] = True
-    config["environment/domain_randomization/push_robots"] = True
+    config = load_config("./config.yaml")
+    config.environment.env.num_envs = min(config.environment.env.num_envs, 4096)
+    config.environment.terrain.curriculum = False
+    config.environment.noise.add_noise = False
+    config.environment.domain_randomization.randomize_friction = True
+    config.environment.domain_randomization.push_robots = True
 
     env = LeggedRobot(config, args.rl_device, args.headless)
 
     model_path = "./logs/model_3000.pt"
 
     actor_critic = TeacherNetwork(config)
-    coach = Coach(env, config.as_dict()["ppo"], actor_critic, "./logs", "cuda")
+    coach = Coach(env, config.ppo, actor_critic, "./logs", "cuda")
     coach.load(model_path)
 
     actor_critic = coach.alg.actor_critic
-    student = StudentPolicy(config["environment/env/num_envs"], actor_critic)
+    student = StudentPolicy(config.environment.env.num_envs, actor_critic)
 
     distiller = Distiller(config, actor_critic, student, env, 50_000, args.headless, "cuda", "./logs/distill_blind2")
     distiller.distill()
 
     student_policy = StudentPolicyJitted(student)
     student_policy.export("./logs/student_jitted.pt")
-
 
 if __name__ == "__main__":
     args = parse_args()

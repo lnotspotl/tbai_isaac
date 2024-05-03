@@ -15,6 +15,10 @@ from tbai_isaac.common.math import quat_apply_yaw, wrap_to_pi
 from tbai_isaac.common.observation import ObservationManager
 from tbai_isaac.common.terrain import Terrain
 
+from tbai_isaac.common.config import select
+
+import tbai_isaac.anymal_d.perceptive.config as ac
+
 
 class LeggedRobot(BaseEnv):
     def __init__(self, yaml_cfg, sim_device, headless):
@@ -33,24 +37,24 @@ class LeggedRobot(BaseEnv):
 
         self.anymal_config = yaml_cfg
 
-        self.asset_config = self.anymal_config.get_asset_config()
-        self.domain_randomization_config = self.anymal_config.get_randomization_config()
-        self.terrain_config = self.anymal_config.get_terrain_config()
-        self.command_config = self.anymal_config.get_command_config()
-        self.env_config = self.anymal_config.get_env_config()
-        self.control_config = self.anymal_config.get_control_config()
-        self.viewer_config = self.anymal_config.get_viewer_config()
-        self.normalization_config = self.anymal_config.get_normalization_config()
-        self.rewards_config = self.anymal_config.get_rewards_config()
-        self.init_state_config = self.anymal_config.get_init_state_config()
-        self.noise_config = self.anymal_config.get_noise_config()
-        self.sim_config = self.anymal_config.get_sim_config()
+        self.asset_config = ac.get_asset_config(self.anymal_config)
+        self.domain_randomization_config = ac.get_randomization_config(self.anymal_config)
+        self.terrain_config = ac.get_terrain_config(self.anymal_config)
+        self.command_config = ac.get_command_config(self.anymal_config)
+        self.env_config = ac.get_env_config(self.anymal_config)
+        self.control_config = ac.get_control_config(self.anymal_config)
+        self.viewer_config = ac.get_viewer_config(self.anymal_config)
+        self.normalization_config = ac.get_normalization_config(self.anymal_config)
+        self.rewards_config = ac.get_rewards_config(self.anymal_config)
+        self.init_state_config = ac.get_init_state_config(self.anymal_config)
+        self.noise_config = ac.get_noise_config(self.anymal_config)
+        self.sim_config = ac.get_sim_config(self.anymal_config)
 
         self.observation_managers: OrderedDict[str, ObservationManager] = OrderedDict()
 
-        self.clip_actions = self.anymal_config["environment/normalization/clip_actions", float]
+        self.clip_actions = select(self.anymal_config, "environment.normalization.clip_actions")
 
-        self.sim_params = self.anymal_config.get_sim_params()
+        self.sim_params = ac.get_sim_params(self.anymal_config)
         self.height_samples = None
         self.debug_viz = False
         self.init_done = False
@@ -860,7 +864,7 @@ class LeggedRobot(BaseEnv):
 
         for i in range(self.num_dofs):
             name = self.dof_names[i]
-            angle = self.anymal_config["environment/init_state/default_joint_angles"][name]
+            angle = self.anymal_config.environment.init_state.default_joint_angles[name]
             self.default_dof_pos[i] = angle
             found = False
             for j, dof_name in enumerate(self.control_config.joints):
@@ -965,7 +969,7 @@ class LeggedRobot(BaseEnv):
         asset_root = os.path.dirname(asset_path)
         asset_file = os.path.basename(asset_path)
 
-        asset_options = self.anymal_config.get_asset_options()
+        asset_options = ac.get_asset_options(self.anymal_config)
 
         robot_asset = self.gym.load_asset(self.sim, asset_root, asset_file, asset_options)
         self.num_dof = self.gym.get_asset_dof_count(robot_asset)
@@ -1100,7 +1104,7 @@ class LeggedRobot(BaseEnv):
     def _parse_cfg(self):
         self.dt = self.control_config.decimation * self.sim_config.dt
         self.obs_scales = self.normalization_config.obs_scales
-        self.reward_scales = self.anymal_config.as_dict("environment/rewards/scales")
+        self.reward_scales = self.anymal_config.environment.rewards.scales
 
         self.command_ranges = self.command_config.ranges
 

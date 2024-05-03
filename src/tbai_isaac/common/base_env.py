@@ -23,8 +23,6 @@ class BaseEnv:
         sim_device: str = "cuda",
     ):
         # Initialize parent class - VecEnv
-        super().__init__(num_obs, num_privileged_obs, device, num_envs, max_episode_length)
-
         self.num_obs = num_obs
         self.num_privileged_obs = num_privileged_obs
         self.device = device

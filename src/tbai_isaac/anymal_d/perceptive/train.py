@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
 
 
-from tbai_isaac.anymal_d.perceptive.config import AnymalConfig
 from tbai_isaac.anymal_d.perceptive.env import LeggedRobot
 from tbai_isaac.anymal_d.perceptive.teacher import TeacherNetwork
 from tbai_isaac.common.args import parse_args
 from tbai_isaac.ppo.coach import Coach
 
+from tbai_isaac.common.config import load_config, select
+
 
 def train(args):
-    config = AnymalConfig("./config.yaml")
+    config = load_config("./config.yaml")
     if args.max_iterations is None:
         args.max_iterations = config["ppo/runner/max_iterations"]
 
@@ -17,7 +18,7 @@ def train(args):
 
     actor_critic = TeacherNetwork(config)
 
-    coach = Coach(env, config.as_dict()["ppo"], actor_critic, "./logs3", "cuda")
+    coach = Coach(env, config.ppo, actor_critic, "./logs3", "cuda")
 
     coach.train(args.max_iterations, True)
 
