@@ -9,6 +9,7 @@ from torch.utils.tensorboard import SummaryWriter
 from .algorithm import PPO
 
 from tbai_isaac.common.writers import Writer
+from tbai_isaac.common.logging import get_logger
 
 class Coach:
     def __init__(self, env, train_cfg, ac, log_dir=None, device="cpu", writer_type="tensorboard"):
@@ -29,9 +30,11 @@ class Coach:
             [self.env.num_actions],
         )
 
+        self.logger = get_logger("Coach", log_to_stdout=True, log_to_file=True, log_file="./coach.log")
+
         # Log
         self.log_dir = log_dir
-        self.writer = Writer(type=writer_type)
+        self.writer = Writer(type=writer_type, log_dir=self.log_dir)
 
         self.tot_timesteps = 0
         self.tot_time = 0
@@ -40,9 +43,6 @@ class Coach:
         _, _ = self.env.reset()
 
     def train(self, num_learning_iterations, init_at_random_ep_len=False):
-        # initialize writer
-        if self.log_dir is not None and self.writer is None:
-            self.writer = SummaryWriter(log_dir=self.log_dir, flush_secs=10)
         if init_at_random_ep_len:
             self.env.episode_length_buf = torch.randint_like(
                 self.env.episode_length_buf, high=int(self.env.max_episode_length)
@@ -184,6 +184,7 @@ class Coach:
         print(log_string)
 
     def save(self, path, infos=None):
+        self.logger.info(f"Saving model to {path}. Mean reward: {statistics.mean(self.rewbuffer)}")
         torch.save(
             {
                 "model_state_dict": self.alg.actor_critic.state_dict(),

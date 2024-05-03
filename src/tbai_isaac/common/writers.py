@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 
 class Writer:
-    def __init__(self, type):
+    def __init__(self, type, log_dir):
         assert type in ["tensorboard", "wandb", "none"], f"Invalid writer type: {type}"
         self.type = type
 
         if self.type == "tensorboard":
             from torch.utils.tensorboard import SummaryWriter
-            self.writer = SummaryWriter
+            self.writer = SummaryWriter(log_dir)
 
         if self.type == "wandb":
             import wandb
