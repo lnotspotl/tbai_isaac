@@ -44,7 +44,7 @@ def parse_args():
             "name": "--model",
             "type": str,
             "help": "Path to the model file.",
-        }
+        },
     ]
 
     # parse arguments
@@ -71,6 +71,7 @@ def set_seed(seed):
     torch.cuda.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
     return seed
+
 
 def store_config(args, config):
     log_dir = args.log_dir

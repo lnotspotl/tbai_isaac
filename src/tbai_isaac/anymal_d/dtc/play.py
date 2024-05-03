@@ -9,7 +9,6 @@ from tbai_isaac.ppo.coach import Coach
 
 
 def train(args):
-
     config = load_config(args.config)
     config.environment.env.num_envs = min(config.environment.env.num_envs, 5)
     config.environment.terrain.num_rows = 5

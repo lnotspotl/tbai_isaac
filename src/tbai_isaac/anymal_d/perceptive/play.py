@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import os
+
 import isaacgym  # noqa: F401
 import torch
 from tbai_isaac.anymal_d.perceptive.env import LeggedRobot
@@ -33,7 +34,6 @@ def train(args):
     env = LeggedRobot(config, args.headless)
     assert args.model is not None, "Model must be provided"
     model_path = os.path.join(args.log_dir, args.model)
-
 
     actor_critic = TeacherNetwork(config)
 

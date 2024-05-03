@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+
 class Writer:
     def __init__(self, type, log_dir):
         assert type in ["tensorboard", "wandb", "none"], f"Invalid writer type: {type}"
@@ -7,12 +8,14 @@ class Writer:
 
         if self.type == "tensorboard":
             from torch.utils.tensorboard import SummaryWriter
+
             self.writer = SummaryWriter(log_dir)
 
         if self.type == "wandb":
             import wandb
+
             self.wandb = wandb
-            self.buffer = dict() 
+            self.buffer = dict()
 
         self.step = -1
 
@@ -26,6 +29,6 @@ class Writer:
                 self.buffer = dict()
             self.buffer[tag] = value
             self.step = global_step
-        
+
         if self.type == "none":
             pass  # do nothing

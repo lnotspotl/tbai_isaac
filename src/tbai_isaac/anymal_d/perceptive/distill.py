@@ -1,21 +1,19 @@
 #!/usr/bin/env python3
 
+import tbai_isaac.anymal_d.perceptive.config as ac
 import tbai_isaac.anymal_d.perceptive.student as student
 import torch
 import torch.nn as nn
 import torch.optim as optim
 import tqdm
 from tbai_isaac.anymal_d.common.noise_model import ExteroceptiveNoiseGenerator
-from tbai_isaac.anymal_d.perceptive.config import 
 from tbai_isaac.anymal_d.perceptive.env import LeggedRobot
 from tbai_isaac.anymal_d.perceptive.student import StudentPolicy, StudentPolicyJitted
 from tbai_isaac.anymal_d.perceptive.teacher import TeacherNetwork
+from tbai_isaac.common.config import load_config
 from tbai_isaac.common.utils import parse_args
 from tbai_isaac.ppo.coach import Coach
 from torch.utils.tensorboard import SummaryWriter
-
-from tbai_isaac.common.config import load_config, select
-from tbai_isaac.anymal_d.perceptive.config import ac
 
 
 class Distiller:
@@ -193,6 +191,7 @@ def distill(args):
 
     student_policy = StudentPolicyJitted(student)
     student_policy.export("./logs/student_jitted.pt")
+
 
 if __name__ == "__main__":
     args = parse_args()

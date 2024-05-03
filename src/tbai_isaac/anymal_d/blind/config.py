@@ -11,8 +11,7 @@ def get_asset_options(config: OmegaConf) -> gymapi.AssetOptions:
     asset_options = gymapi.AssetOptions()
     print(config)
     asset_options.default_dof_drive_mode = int(config.environment.asset.default_dof_drive_mode)
-    
-    
+
     asset_options.collapse_fixed_joints = bool(config.environment.asset.collapse_fixed_joints)
     asset_options.replace_cylinder_with_capsule = bool(config.environment.asset.replace_cylinder_with_capsule)
     asset_options.flip_visual_attachments = bool(config.environment.asset.flip_visual_attachments)
@@ -27,9 +26,11 @@ def get_asset_options(config: OmegaConf) -> gymapi.AssetOptions:
     asset_options.disable_gravity = bool(config.environment.asset.disable_gravity)
     return asset_options
 
+
 def get_asset_config(config: OmegaConf):
     config.environment.asset.file = URDF_PATH
     return select(config, "environment.asset")
+
 
 def get_randomization_config(config: OmegaConf):
     dt = config.environment.sim.dt * config.environment.control.decimation
@@ -38,35 +39,46 @@ def get_randomization_config(config: OmegaConf):
     config.environment.domain_randomization.push_interval = float(np.ceil(push_interval_s / dt))
     return select(config, "environment.domain_randomization")
 
+
 def get_terrain_config(config: OmegaConf):
     return select(config, "environment.terrain")
+
 
 def get_command_config(config: OmegaConf):
     return select(config, "environment.command")
 
+
 def get_env_config(config: OmegaConf):
     return select(config, "environment.env")
+
 
 def get_control_config(config: OmegaConf):
     return select(config, "environment.control")
 
+
 def get_viewer_config(config: OmegaConf):
     return select(config, "environment.viewer")
+
 
 def get_normalization_config(config: OmegaConf):
     return select(config, "environment.normalization")
 
+
 def get_rewards_config(config: OmegaConf):
     return select(config, "environment.rewards")
+
 
 def get_init_state_config(config: OmegaConf):
     return select(config, "environment.init_state")
 
+
 def get_noise_config(config: OmegaConf):
     return select(config, "environment.noise")
 
+
 def get_sim_config(config: OmegaConf):
     return select(config, "environment.sim")
+
 
 def get_sim_params(config: OmegaConf) -> gymapi.SimParams:
     sim_config = select(config, "environment.sim")
