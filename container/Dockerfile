@@ -67,7 +67,7 @@ RUN touch /bin/nvidia-smi && \
     touch /var/run/nvidia-persistenced/socket
 
 # FOLDERS for 
-RUN mkdir -p ${HOME}/tmp # temporary folder
+
 RUN mkdir -p ${HOME}/wormhole # persistent folder
 
 # Set initial working directory
