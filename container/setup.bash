@@ -15,4 +15,6 @@ echo "Installing tbai_isaac..."
 cd $HOME/tbai_bindings && source devel/setup.bash
 cd $HOME/tbai_isaac && pip3 install -e .
 
+export PS1='${debian_chroot:+($debian_chroot)}\[\033[01;32m\]\u@\h\[\033[00m\] (container):\[\033[01;34m\]\w\[\033[00m\]\$ '
+
 echo "All done. Enjoy 🤗"

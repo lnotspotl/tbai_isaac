@@ -1,10 +1,11 @@
+from int import get_interface
 import os
 from collections import OrderedDict
 
 import numpy as np
-import pytorch3d.transforms
 import torch
-from int import get_interface
+import pytorch3d.transforms
+
 from isaacgym import gymapi, gymtorch, gymutil
 from isaacgym.torch_utils import *
 from tbai_isaac.anymal_d.common.central_pattern_generator import CentralPatternGenerator
@@ -14,6 +15,8 @@ from tbai_isaac.common.base_env import BaseEnv
 from tbai_isaac.common.math import quat_apply_yaw, quat_apply_yaw_inverse, wrap_to_pi
 from tbai_isaac.common.observation import ObservationManager
 from tbai_isaac.common.terrain import Terrain
+import tbai_isaac.anymal_d.dtc.config as ac
+from tbai_isaac.common.config import select
 
 
 class LeggedRobot(BaseEnv):
@@ -33,18 +36,18 @@ class LeggedRobot(BaseEnv):
 
         self.anymal_config = yaml_cfg
 
-        self.asset_config = self.anymal_config.get_asset_config()
-        self.domain_randomization_config = self.anymal_config.get_randomization_config()
-        self.terrain_config = self.anymal_config.get_terrain_config()
-        self.command_config = self.anymal_config.get_command_config()
-        self.env_config = self.anymal_config.get_env_config()
-        self.control_config = self.anymal_config.get_control_config()
-        self.viewer_config = self.anymal_config.get_viewer_config()
-        self.normalization_config = self.anymal_config.get_normalization_config()
-        self.rewards_config = self.anymal_config.get_rewards_config()
-        self.init_state_config = self.anymal_config.get_init_state_config()
-        self.noise_config = self.anymal_config.get_noise_config()
-        self.sim_config = self.anymal_config.get_sim_config()
+        self.asset_config = ac.get_asset_config(self.anymal_config)
+        self.domain_randomization_config = ac.get_randomization_config(self.anymal_config)
+        self.terrain_config = ac.get_terrain_config(self.anymal_config)
+        self.command_config = ac.get_command_config(self.anymal_config)
+        self.env_config = ac.get_env_config(self.anymal_config)
+        self.control_config = ac.get_control_config(self.anymal_config)
+        self.viewer_config = ac.get_viewer_config(self.anymal_config)
+        self.normalization_config = ac.get_normalization_config(self.anymal_config)
+        self.rewards_config = ac.get_rewards_config(self.anymal_config)
+        self.init_state_config = ac.get_init_state_config(self.anymal_config)
+        self.noise_config = ac.get_noise_config(self.anymal_config)
+        self.sim_config = ac.get_sim_config(self.anymal_config)
 
         self.current_time = 0.0
 
@@ -52,9 +55,9 @@ class LeggedRobot(BaseEnv):
 
         self.observation_managers: OrderedDict[str, ObservationManager] = OrderedDict()
 
-        self.clip_actions = self.anymal_config["environment/normalization/clip_actions", float]
+        self.clip_actions = select(self.anymal_config, "environment.normalization.clip_actions")
 
-        self.sim_params = self.anymal_config.get_sim_params()
+        self.sim_params = ac.get_sim_params(self.anymal_config)
         self.height_samples = None
         self.debug_viz = True
         self.init_done = False
@@ -80,11 +83,18 @@ class LeggedRobot(BaseEnv):
             sim_device="cuda",
         )
 
-        self.ig_interface = get_interface(self.num_envs, torch)
+        print("Creating interface")
+
+        self.rviz_visualize = True
+        self.ig_interface = get_interface(self.num_envs, torch, self.rviz_visualize)
+
+        print("Interface created")
 
         self.ig_interface.reset_all_solvers(self.current_time)
+        print("Solvers reset")
         self.ig_interface.update_all_states(torch.zeros(self.num_envs, 12 + 12))
 
+        print("States updated")
         self.time_till_optimization = self.ig_interface.updated_in_seconds()
 
         print(self.privileged_obs_buf)
@@ -220,11 +230,19 @@ class LeggedRobot(BaseEnv):
         self.ig_interface.update_desired_base(self.current_time + self.dt, torch.arange(0, self.num_envs))
         self.ig_interface.move_desired_base_to_gpu()
 
+
         # Update last action history buffer
         self.compute_reward()
         self.dof_action_history[self.dof_action_idx, :] = self.actions[:]
         self.dof_action_idx = (self.dof_action_idx + 1) % self.dof_action_history_length
         self.compute_observations()  # in some cases a simulation step might be required to refresh some obs (for example body positions)
+
+        if(self.rviz_visualize):
+            env_id = 0
+            ocs2_state = self.get_ocs2_state(torch.arange(env_id, env_id+2))[0]
+            current_time = self.current_time
+            current_obs = self.obs_buf[env_id]
+            self.ig_interface.visualize(current_time, ocs2_state, env_id, current_obs)
 
         # Compute observation for each observation manager
         for observation_manager in self.observation_managers.values():
@@ -360,17 +378,17 @@ class LeggedRobot(BaseEnv):
         # print(f"Base angular velocity: {self.base_ang_vel}")
 
         # Projected gravity
-        gravity_noise = self.generate_uniform(size=(self.num_envs, 3), low=-0.05, high=0.05, device=self.device)
+        gravity_noise = self.generate_uniform(size=(self.num_envs, 3), low=-0.05, high=0.05, device=self.device) * 0
         projected_gravity = self.projected_gravity + gravity_noise
         # print(f"Projected gravity: {projected_gravity}")
 
         # Joint positions
-        dof_pos_noise = self.generate_uniform(size=(self.num_envs, 12), low=-0.01, high=0.01, device=self.device)
+        dof_pos_noise = self.generate_uniform(size=(self.num_envs, 12), low=-0.01, high=0.01, device=self.device) * 0
         dof_pos = (self.dof_pos + dof_pos_noise - self.default_dof_pos) * self.obs_scales.dof_pos
         # print(f"Joint positions: {dof_pos}")
 
         # Joint velocities
-        dof_vel_noise = self.generate_uniform(size=(self.num_envs, 12), low=-0.3, high=0.3, device=self.device)
+        dof_vel_noise = self.generate_uniform(size=(self.num_envs, 12), low=-0.3, high=0.3, device=self.device) * 0
         dof_vel = (self.dof_vel + dof_vel_noise) * self.obs_scales.dof_vel
         # print(f"Joint velocities: {dof_vel}")
 
@@ -379,8 +397,8 @@ class LeggedRobot(BaseEnv):
         # print(f"Past actions: {actions}")
 
         # Planar footholds
-        planar_footholds_noise = self.generate_uniform(
-            size=(self.num_envs, 4 * 2), low=-0.01, high=0.01, device=self.device
+        planar_footholds_noise = (
+            self.generate_uniform(size=(self.num_envs, 4 * 2), low=-0.01, high=0.01, device=self.device) * 0
         )
         planar_footholds = torch.zeros((self.num_envs, 4 * 2), device=self.device) + planar_footholds_noise
 
@@ -975,7 +993,7 @@ class LeggedRobot(BaseEnv):
 
         for i in range(self.num_dofs):
             name = self.dof_names[i]
-            angle = self.anymal_config["environment/init_state/default_joint_angles"][name]
+            angle = self.anymal_config.environment.init_state.default_joint_angles[name]
             self.default_dof_pos[i] = angle
             found = False
             for j, dof_name in enumerate(self.control_config.joints):
@@ -1095,7 +1113,7 @@ class LeggedRobot(BaseEnv):
         asset_root = os.path.dirname(asset_path)
         asset_file = os.path.basename(asset_path)
 
-        asset_options = self.anymal_config.get_asset_options()
+        asset_options = ac.get_asset_options(self.anymal_config)
 
         robot_asset = self.gym.load_asset(self.sim, asset_root, asset_file, asset_options)
         self.num_dof = self.gym.get_asset_dof_count(robot_asset)
@@ -1230,7 +1248,7 @@ class LeggedRobot(BaseEnv):
     def _parse_cfg(self):
         self.dt = self.control_config.decimation * self.sim_config.dt
         self.obs_scales = self.normalization_config.obs_scales
-        self.reward_scales = self.anymal_config.as_dict("environment/rewards/scales")
+        self.reward_scales = self.anymal_config.environment.rewards.scales
 
         self.command_ranges = self.command_config.ranges
 
@@ -1290,6 +1308,15 @@ class LeggedRobot(BaseEnv):
                 z = 0.0
                 sphere_pose = gymapi.Transform(gymapi.Vec3(x, y, z), r=None)
                 gymutil.draw_lines(sphere_geom, self.gym, self.viewer, self.envs[0], sphere_pose)
+
+        # Draw a sphere above the first robot
+        x = self.root_states[0, 0]
+        y = self.root_states[0, 1]
+        z = self.root_states[0, 2] + 0.5
+        sphere_geom = gymutil.WireframeSphereGeometry(0.5, 4, 4, None, color=(0, 1, 0))
+        sphere_pose = gymapi.Transform(gymapi.Vec3(x, y, z), r=None)
+        gymutil.draw_lines(sphere_geom, self.gym, self.viewer, self.envs[0], sphere_pose)
+        
 
     def draw_spheres(self, x, y, z, reset=True, id=0, color=(1, 1, 0)):
         # heights = torch.clip(self.root_states[:, 2].unsqueeze(1) - 0.5 - measured_heights, -1, 1.) * self.obs_scales.height_measurements

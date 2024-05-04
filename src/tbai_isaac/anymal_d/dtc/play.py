@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+from int import get_interface
+from isaacgym import gymapi, gymtorch, gymutil
 import torch
 from tbai_isaac.anymal_d.dtc.agent import AgentNetwork
 from tbai_isaac.anymal_d.dtc.env import LeggedRobot
@@ -28,8 +30,12 @@ def train(args):
     model_path = "./model.pt"
 
     actor_critic = AgentNetwork(config)
+    import os
 
-    coach = Coach(env, config.ppo, actor_critic, "./logs", "cuda")
+
+    os.makedirs("./logs", exist_ok=True)
+
+    coach = Coach(env, config.ppo, actor_critic, "./logs")
     coach.load(model_path)
 
     policy = coach.get_inference_policy()

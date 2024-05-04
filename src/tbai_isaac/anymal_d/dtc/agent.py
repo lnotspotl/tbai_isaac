@@ -15,16 +15,16 @@ class AgentNetwork(ActorCritic):
 
         self.cfg = cfg
 
-        num_actor_obs = cfg["environment/env/num_observations"]
-        num_critic_obs = cfg["environment/env/num_privileged_observations"]
+        num_actor_obs = cfg.environment.env.num_observations
+        num_critic_obs = cfg.environment.env.num_privileged_observations
 
         if num_critic_obs == 0:
             num_critic_obs = num_actor_obs
 
-        activation = cfg["ppo/policy/activation"]
-        actor_hidden_dims = cfg["ppo/policy/actor_hidden_dims"]
-        critic_hidden_dims = cfg["ppo/policy/critic_hidden_dims"]
-        init_noise_std = cfg["ppo/policy/init_noise_std"]
+        activation = cfg.ppo.policy.activation
+        actor_hidden_dims = cfg.ppo.policy.actor_hidden_dims
+        critic_hidden_dims = cfg.ppo.policy.critic_hidden_dims
+        init_noise_std = cfg.ppo.policy.init_noise_std
 
         activation = self.get_activation(activation)
 

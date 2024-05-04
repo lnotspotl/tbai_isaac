@@ -5,12 +5,6 @@ ISAACGYM_DIR="$SCRIPT_DIR/isaacgym"
 TBAIBINDINGS_DIR="$SCRIPT_DIR/tbai_bindings"
 TBAIISAAC_DIR="$SCRIPT_DIR/../"
 
-if [[ -z $1 ]]; then
-  echo "Usage: ./helper.bash [--build_docker|--build_singularity|--run_docker|--run_singularity|--install_docker|--install_singularity|--pack_singuarity]"
-  exit
-fi
-
-
 if [[ $1 == "--build_docker" ]]; then
 
   if [ ! -d $ISAACGYM_DIR ]; then
@@ -29,11 +23,13 @@ if [[ $1 == "--build_docker" ]]; then
   echo "Building container..."
   DOCKERIMAGE_NAME="tbai_isaac"
   docker build -t $DOCKERIMAGE_NAME -f $SCRIPT_DIR/Dockerfile $SCRIPT_DIR
+  exit
 fi
 
 if [[ $1 == "--build_singularity" ]]; then
   SINGULARITYIMAGE_NAME="tbai_isaac.sif"
   singularity build --sandbox $SINGULARITYIMAGE_NAME docker-daemon://tbai_isaac:latest
+  exit
 fi
 
 if [[ $1 == "--run_docker" ]]; then
@@ -43,6 +39,7 @@ if [[ $1 == "--run_docker" ]]; then
   # -it  ... interactive seshion
   # --runtime=nvidia ... gives access to nvidia gpus
   # --privileged     ... without this gpu is inaccessible
+  exit
 fi
 
 if [[ $1 == "--run_singularity" ]]; then
@@ -53,11 +50,11 @@ if [[ $1 == "--run_singularity" ]]; then
   singularity exec --nv --writable --no-home --containall \
   --bind ..:/home/tbai/tbai_isaac/ \
   --bind ./tmp:/tmp \
-  --bind ./wormhole:/wormhole \
-   $SINGULARITYIMAGE_NAME bash
+   $SINGULARITYIMAGE_NAME bash -c "cd /home/tbai && rm ./setup.bash && ln -s ./tbai_isaac/container/setup.bash . && bash"
   # --nv ... gives access to nvidia gpus
 
   rm -rf ./tmp
+  exit
 fi
 
 if [[ $1 == "--install_docker" ]]; then 
@@ -80,6 +77,7 @@ if [[ $1 == "--install_docker" ]]; then
 
   # Test installation
   sudo docker run hello-world
+  exit
 fi
 
 if [[ $1 == "--install_singularity" ]]; then
@@ -95,14 +93,17 @@ if [[ $1 == "--install_singularity" ]]; then
 
   # Clean up
   rm ${NAME}
+  exit
 fi
 
 if [[ $1 == "--pack_singularity" ]]; then
-  tar -cf tbai_isaac.tar.gz tbai_isaac.sif # Tar without compression - faster
+  tar -cf tbai_isaac.tar.gz $SCRIPT_DIR/.. # Tar without compression - faster
+  exit
 fi
 
 if [[ $1 == "--unpack_singularity" ]]; then
   tar -xf tbai_isaac.tar.gz
+  exit
 fi
 
 if [[ $1 == "--pack_builder" ]]; then
@@ -122,4 +123,7 @@ if [[ $1 == "--pack_builder" ]]; then
   fi
 
   tar -cf tbai_isaac.tar.gz ${TBAIISAAC_DIR}
+  exit
 fi
+
+echo "Usage: ./helper.bash [--build_docker|--build_singularity|--run_docker|--run_singularity|--install_docker|--install_singularity|--pack_singuarity|--unpack_singularity|--pack_builder]"

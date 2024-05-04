@@ -683,12 +683,12 @@ class LeggedRobot(BaseEnv):
             torch.mean(self.episode_sums["tracking_lin_vel"][env_ids]) / self.max_episode_length
             > 0.5 * self.reward_scales["tracking_lin_vel"]
         ):
-            self.command_ranges.lin_vel_x[0] = np.clip(
+            self.command_ranges.lin_vel_x[0] = float(np.clip(
                 self.command_ranges.lin_vel_x[0] - 0.5, -self.command_config.max_curriculum, 0.0
-            )
-            self.command_ranges.lin_vel_x[1] = np.clip(
+            ))
+            self.command_ranges.lin_vel_x[1] = float(np.clip(
                 self.command_ranges.lin_vel_x[1] + 0.5, 0.0, self.command_config.max_curriculum
-            )
+            ))
 
     def _get_noise_scale_vec(self):
         """Sets a vector used to scale the noise added to the observations.

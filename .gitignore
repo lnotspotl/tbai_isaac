@@ -16,3 +16,5 @@ isaacgym/
 tbai_bindings/
 tbai_isaac.sif
 wormhole/
+*.tar.gz
+*.pt

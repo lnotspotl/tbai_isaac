@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+import os
+
 
 class Writer:
     def __init__(self, type, log_dir):
@@ -13,6 +15,10 @@ class Writer:
 
         if self.type == "wandb":
             import wandb
+
+            wandb_dir = os.path.join(log_dir, "wandb")
+            os.makedirs(wandb_dir, exist_ok=True)
+            wandb.init(project="tbai", dir=wandb_dir)
 
             self.wandb = wandb
             self.buffer = dict()
