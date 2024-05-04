@@ -16,6 +16,8 @@ RUN pip3 --no-cache-dir install networkx==3.1  # This is because otherwise torch
 RUN pip3 install --no-cache-dir torch==2.0.1 --index-url https://download.pytorch.org/whl/cu118
 RUN pip3 install --no-cache-dir wandb tensorboard 
 RUN pip3 install --no-cache-dir numpy==1.20.0 
+RUN pip3 install --no-cache-dir "git+https://github.com/facebookresearch/pytorch3d.git"
+
 
 # Install ROS
 RUN echo "deb http://packages.ros.org/ros/ubuntu focal main" > /etc/apt/sources.list.d/ros-latest.list

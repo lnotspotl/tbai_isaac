@@ -20,7 +20,7 @@ from tbai_isaac.common.config import select
 
 
 class LeggedRobot(BaseEnv):
-    def __init__(self, yaml_cfg, headless, ig_threads):
+    def __init__(self, yaml_cfg, headless, ocs2_interface_threads):
         """Parses the provided config file,
             calls create_sim() (which creates, simulation, terrain and environments),
             initilizes pytorch buffers used during training
@@ -90,7 +90,9 @@ class LeggedRobot(BaseEnv):
         print("Creating interface")
 
         self.rviz_visualize = False
-        self.tbai_ocs2_interface = get_interface(self.num_envs, torch, self.rviz_visualize)
+        self.tbai_ocs2_interface = get_interface(
+            self.num_envs, torch, self.rviz_visualize, num_threads=ocs2_interface_threads
+        )
 
         print("Interface created")
 
@@ -425,9 +427,7 @@ class LeggedRobot(BaseEnv):
         # print(f"Desired joint positions: {desired_joint_angles}")
 
         # Current desired joint positions
-        current_desired_joint_angles = (
-            self.tbai_ocs2_interface.get_current_desired_joint_positions() - d_pos
-        )
+        current_desired_joint_angles = self.tbai_ocs2_interface.get_current_desired_joint_positions() - d_pos
 
         # Desired contact state
         desired_contacts = self.tbai_ocs2_interface.get_desired_contacts()
@@ -470,8 +470,6 @@ class LeggedRobot(BaseEnv):
         phases = self.tbai_ocs2_interface.get_bobnet_phases(self.current_time, torch.arange(0, self.num_envs))
         cpg_obs = self.cpg.get_observation(phases)
 
-        
-
         self.obs_buf = torch.cat(
             [
                 lin_vel,
@@ -511,7 +509,6 @@ class LeggedRobot(BaseEnv):
         self.step_counter += 1
 
         print(torch.mean(torch.vstack(self.stats_observations), dim=0))
-
 
     def create_sim(self):
         """Creates simulation, terrain and evironments"""
@@ -1483,7 +1480,7 @@ class LeggedRobot(BaseEnv):
     def _reward_tracking_angular_velocity_new(self):
         current_velocity = self.base_ang_vel[:, 2]  # (num_envs, )
         desired_velocity = self.commands[:, 2]
-        
+
         desired_velocity_norm = torch.abs(desired_velocity)
         current_velocity_norm = torch.abs(current_velocity)
 
@@ -1651,7 +1648,7 @@ class LeggedRobot(BaseEnv):
 
     def _reward_action_norm(self):
         return torch.norm(self.actions, dim=1)
-    
+
     def _reward_consistency(self):
         c = self.tbai_ocs2_interface.get_consistency_reward().clone()
         self.tbai_ocs2_interface.get_consistency_reward()[:] = 0.0
@@ -1659,28 +1656,28 @@ class LeggedRobot(BaseEnv):
 
     def _reward_foot_position_tracking(self):
         eps = 1e-5
-        
+
         apply_reward = (torch.norm(self.contact_forces[:, self.feet_indices, :3], dim=-1) >= 1.0).float()
-        #print(apply_reward.shape)
-        #print(self.tracking_reward_ready.shape)
+        # print(apply_reward.shape)
+        # print(self.tracking_reward_ready.shape)
         apply_reward *= self.tracking_reward_ready
-        self.tracking_reward_ready *= (1.0 - apply_reward)
+        self.tracking_reward_ready *= 1.0 - apply_reward
 
         tt = torch.logical_and(self.aa, self.bb)
 
-        lf_foot_positions = self.lf_foot_position[:,:2]
+        lf_foot_positions = self.lf_foot_position[:, :2]
         lf_foot_positions_desired = self.tbai_ocs2_interface.get_planar_footholds()[:, 0:2]
         lf_diff = (lf_foot_positions_desired - lf_foot_positions).square().sum(dim=1) + eps
 
-        lh_foot_positions = self.lh_foot_position[:,:2]
+        lh_foot_positions = self.lh_foot_position[:, :2]
         lh_foot_positions_desired = self.tbai_ocs2_interface.get_planar_footholds()[:, 2:4]
         lh_diff = (lh_foot_positions_desired - lh_foot_positions).square().sum(dim=1) + eps
 
-        rf_foot_positions = self.rf_foot_position[:,:2]
+        rf_foot_positions = self.rf_foot_position[:, :2]
         rf_foot_positions_desired = self.tbai_ocs2_interface.get_planar_footholds()[:, 4:6]
         rf_diff = (rf_foot_positions_desired - rf_foot_positions).square().sum(dim=1) + eps
 
-        rh_foot_positions = self.rh_foot_position[:,:2]
+        rh_foot_positions = self.rh_foot_position[:, :2]
         rh_foot_positions_desired = self.tbai_ocs2_interface.get_planar_footholds()[:, 6:8]
         rh_diff = (rh_foot_positions_desired - rh_foot_positions).square().sum(dim=1) + eps
 
@@ -1690,10 +1687,12 @@ class LeggedRobot(BaseEnv):
         self.bb[tt] = False
 
         return -reward
-    
+
     def _reward_exp_base_position(self):
         base_position = self.root_states[:, :3]
-        base_position_desired = self.tbai_ocs2_interface.get_desired_base_positions().to(self.device)  # TODO: Why to(device)? Should be already on device
+        base_position_desired = self.tbai_ocs2_interface.get_desired_base_positions().to(
+            self.device
+        )  # TODO: Why to(device)? Should be already on device
 
         sigma = 1200.0
         # print(base_position_desired[0])
@@ -1706,17 +1705,16 @@ class LeggedRobot(BaseEnv):
     def _reward_exp_base_linear_velocity(self):
         base_velocity = self.root_states[:, 7:10]
         base_velocity_desired = self.tbai_ocs2_interface.get_desired_base_linear_velocities().to(self.device)
-    
+
         # print("Current base velocity:", base_velocity[0])
         # print("Desired base velocity:", base_velocity_desired[0])
         # print()
-
 
         sigma = 10.0
         diff = (base_velocity - base_velocity_desired).square().sum(dim=1)
         reward = torch.exp(-sigma * diff)
         return reward
-    
+
     def _reward_exp_base_orientation(self):
         base_orientation = self.root_states[:, 3:7]
         base_orientation_desired = self.tbai_ocs2_interface.get_desired_base_orientations().to(self.device)
@@ -1733,7 +1731,7 @@ class LeggedRobot(BaseEnv):
         sigma = 90.0
         reward = torch.exp(-sigma * diff)
         return reward
-    
+
     def _reward_exp_base_angular_velocity(self):
         base_angular_velocity = self.root_states[:, 10:13]
         base_angular_velocity_desired = self.tbai_ocs2_interface.get_desired_base_angular_velocities().to(self.device)
@@ -1742,7 +1740,7 @@ class LeggedRobot(BaseEnv):
         diff = (base_angular_velocity - base_angular_velocity_desired).square().sum(dim=1)
         reward = torch.exp(-sigma * diff)
         return reward
-    
+
     def _reward_exp_base_linear_acceleration(self):
         base_acceleration = (self.root_states[:, 7:10] - self.last_base_lin_vel) / self.dt
         base_acceleration_desired = self.tbai_ocs2_interface.get_desired_base_linear_accelerations().to(self.device)
@@ -1751,16 +1749,18 @@ class LeggedRobot(BaseEnv):
         diff = (base_acceleration - base_acceleration_desired).square().sum(dim=1)
         reward = torch.exp(-sigma * diff)
         return reward
-    
+
     def _reward_exp_base_angular_acceleration(self):
         base_angular_acceleration = (self.root_states[:, 10:13] - self.last_base_ang_vel) / self.dt
-        base_angular_acceleration_desired = self.tbai_ocs2_interface.get_desired_base_angular_accelerations().to(self.device)
+        base_angular_acceleration_desired = self.tbai_ocs2_interface.get_desired_base_angular_accelerations().to(
+            self.device
+        )
 
         sigma = 0.005
         diff = (base_angular_acceleration - base_angular_acceleration_desired).square().sum(dim=1)
         reward = torch.exp(-sigma * diff)
         return reward
-    
+
     def _reward_foot_power(self):
         lf_velocity = self.lf_foot_velocity
         lf_force = self.contact_forces[:, self.feet_indices[0], :] * self.obs_scales.contact_forces
@@ -1779,12 +1779,11 @@ class LeggedRobot(BaseEnv):
         rh_power = (rh_velocity * rh_force).norm(dim=1)
 
         return (lf_power + lh_power + rf_power + rh_power).view(-1)
-    
+
     def _reward_z_height(self):
         desired_height = 0.55
         current_height = self.root_states[:, 2]
         diff = (desired_height - current_height).square()
-
 
         return (-diff) * (1.0 - self.ck)
 

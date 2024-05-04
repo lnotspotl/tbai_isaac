@@ -1,13 +1,14 @@
+import os
 import tbai_ocs2_interface
+
+from tbai_isaac.anymal_d.info import URDF_PATH, MPC_TASK_FILE, MPC_REFERENCE_FILE, MPC_GAIT_FILE
 
 
 def get_interface(num_envs, torch, rviz_visualize=False, num_threads=5):
-    task_file = "/home/kuba/fun/ocs2_project/src/ocs2_fun/dependencies/ocs2/ocs2_robotic_examples/ocs2_legged_robot/config/mpc/task.info"
-    urdf_file = (
-        "/home/kuba/fun/ocs2_project/src/ocs2_fun/dependencies/ocs2_robotic_assets/resources/anymal_d/urdf/anymal.urdf"
-    )
-    reference_file = "/home/kuba/fun/ocs2_project/src/ocs2_fun/dependencies/ocs2/ocs2_robotic_examples/ocs2_legged_robot/config/command/reference.info"
-    gait_file = "/home/kuba/fun/ocs2_project/src/ocs2_fun/dependencies/ocs2/ocs2_robotic_examples/ocs2_legged_robot/config/command/gait.info"
+    task_file = MPC_TASK_FILE
+    urdf_file = URDF_PATH
+    reference_file = MPC_REFERENCE_FILE
+    gait_file = MPC_GAIT_FILE
     gait = "trot"
 
     ig = tbai_ocs2_interface.TbaiIsaacGymInterface(
