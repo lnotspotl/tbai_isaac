@@ -29,7 +29,7 @@ def train(args):
 
     actor_critic = AgentNetwork(config)
 
-    coach = Coach(env, config.ppo, actor_critic, args.log_dir, writer_type="none")
+    coach = Coach(env, config.ppo, actor_critic, args.log_dir, writer_type=args.writer_type)
 
     coach.train(args.max_iterations, True)
 

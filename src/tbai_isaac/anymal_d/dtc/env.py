@@ -57,6 +57,9 @@ class LeggedRobot(BaseEnv):
 
         self.clip_actions = select(self.anymal_config, "environment.normalization.clip_actions")
 
+        self.last_base_lin_vel = None
+        self.last_base_ang_vel = None
+
         self.sim_params = ac.get_sim_params(self.anymal_config)
         self.height_samples = None
         self.debug_viz = True
@@ -64,6 +67,7 @@ class LeggedRobot(BaseEnv):
         self._parse_cfg()
 
         num_obs = self.env_config.num_observations
+        self.stats_observations = []
         num_privileged_obs = self.env_config.num_privileged_observations
         if num_privileged_obs is None:
             num_privileged_obs = 0
@@ -171,6 +175,9 @@ class LeggedRobot(BaseEnv):
         calls self._post_physics_step_callback() for common computations
         calls self._draw_debug_vis() if needed
         """
+        self.last_base_lin_vel = self.root_states[:, 7:10]
+        self.last_base_ang_vel = self.root_states[:, 10:13]
+
         self.gym.refresh_actor_root_state_tensor(self.sim)
         self.gym.refresh_net_contact_force_tensor(self.sim)
         self.gym.refresh_rigid_body_state_tensor(self.sim)
@@ -214,7 +221,8 @@ class LeggedRobot(BaseEnv):
         self.bb[:, :] = torch.logical_and(
             torch.logical_not(self.tbai_ocs2_interface.get_desired_contacts()),
             torch.logical_and(
-                self.tbai_ocs2_interface.get_time_left_in_phase() <= 0.025, self.tbai_ocs2_interface.get_time_left_in_phase() >= 0.0
+                self.tbai_ocs2_interface.get_time_left_in_phase() <= 0.025,
+                self.tbai_ocs2_interface.get_time_left_in_phase() >= 0.0,
             ),
         ).float()
 
@@ -230,16 +238,15 @@ class LeggedRobot(BaseEnv):
         self.tbai_ocs2_interface.update_desired_base(self.current_time + self.dt, torch.arange(0, self.num_envs))
         self.tbai_ocs2_interface.move_desired_base_to_gpu()
 
-
         # Update last action history buffer
         self.compute_reward()
         self.dof_action_history[self.dof_action_idx, :] = self.actions[:]
         self.dof_action_idx = (self.dof_action_idx + 1) % self.dof_action_history_length
         self.compute_observations()  # in some cases a simulation step might be required to refresh some obs (for example body positions)
 
-        if(self.rviz_visualize):
+        if self.rviz_visualize:
             env_id = 0
-            ocs2_state = self.get_ocs2_state(torch.arange(env_id, env_id+2))[0]
+            ocs2_state = self.get_ocs2_state(torch.arange(env_id, env_id + 2))[0]
             current_time = self.current_time
             current_obs = self.obs_buf[env_id]
             self.tbai_ocs2_interface.visualize(current_time, ocs2_state, env_id, current_obs)
@@ -368,6 +375,8 @@ class LeggedRobot(BaseEnv):
         return out.to(device)
 
     def compute_observations(self):
+        d_pos = self.default_dof_pos if self.aik.tt is None else self.aik.tt
+
         # Base linear velocity
         lin_vel = self.base_lin_vel * self.obs_scales.lin_vel
 
@@ -384,7 +393,7 @@ class LeggedRobot(BaseEnv):
 
         # Joint positions
         dof_pos_noise = self.generate_uniform(size=(self.num_envs, 12), low=-0.01, high=0.01, device=self.device) * 0
-        dof_pos = (self.dof_pos + dof_pos_noise - self.default_dof_pos) * self.obs_scales.dof_pos
+        dof_pos = (self.dof_pos + dof_pos_noise - d_pos) * self.obs_scales.dof_pos
         # print(f"Joint positions: {dof_pos}")
 
         # Joint velocities
@@ -412,11 +421,13 @@ class LeggedRobot(BaseEnv):
         # print(f"Planar footholds: {planar_footholds}")
 
         # Desired joint positions
-        desired_joint_angles = self.tbai_ocs2_interface.get_desired_joint_positions() - self.dof_pos
+        desired_joint_angles = self.tbai_ocs2_interface.get_desired_joint_positions() - d_pos
         # print(f"Desired joint positions: {desired_joint_angles}")
 
         # Current desired joint positions
-        current_desired_joint_angles = self.tbai_ocs2_interface.get_current_desired_joint_positions() - self.default_dof_pos
+        current_desired_joint_angles = (
+            self.tbai_ocs2_interface.get_current_desired_joint_positions() - d_pos
+        )
 
         # Desired contact state
         desired_contacts = self.tbai_ocs2_interface.get_desired_contacts()
@@ -456,6 +467,11 @@ class LeggedRobot(BaseEnv):
         desid_base_ang_acc = self.tbai_ocs2_interface.get_desired_base_angular_accelerations()
         desid_base_ang_acc = quat_apply(quat_conjugate(self.base_quat), desid_base_ang_acc)
 
+        phases = self.tbai_ocs2_interface.get_bobnet_phases(self.current_time, torch.arange(0, self.num_envs))
+        cpg_obs = self.cpg.get_observation(phases)
+
+        
+
         self.obs_buf = torch.cat(
             [
                 lin_vel,
@@ -476,9 +492,12 @@ class LeggedRobot(BaseEnv):
                 desired_base_ang_vel,
                 desid_base_lin_acc,
                 desid_base_ang_acc,
+                cpg_obs,
             ],
             dim=-1,
         )
+
+        self.stats_observations.append(torch.mean(self.obs_buf, dim=0))
 
         self.privileged_obs_buf = self.obs_buf.clone()
         for i in range(4):
@@ -490,6 +509,9 @@ class LeggedRobot(BaseEnv):
             self.privileged_obs_buf = torch.cat((self.privileged_obs_buf, contact_force_body), dim=-1)
 
         self.step_counter += 1
+
+        print(torch.mean(torch.vstack(self.stats_observations), dim=0))
+
 
     def create_sim(self):
         """Creates simulation, terrain and evironments"""
@@ -686,10 +708,9 @@ class LeggedRobot(BaseEnv):
             torques = actions_scaled
         elif control_type == "CPG":
             dof_residuals = actions_scaled
-            joint_angles = self.aik.compute_ik(self.cpg.leg_heights())
-
-            self.aik.tt = self.aik.compute_ik(self.cpg.leg_heights())
-
+            phases = self.tbai_ocs2_interface.get_bobnet_phases(self.current_time, torch.arange(0, self.num_envs))
+            joint_angles = self.aik.compute_ik(self.cpg.leg_heights(phases))
+            self.aik.tt = joint_angles
             torques = (
                 self.p_gains[:12] * (dof_residuals + joint_angles - self.dof_pos) - self.d_gains[:12] * self.dof_vel
             )
@@ -797,12 +818,12 @@ class LeggedRobot(BaseEnv):
             torch.mean(self.episode_sums["tracking_lin_vel"][env_ids]) / self.max_episode_length
             > 0.5 * self.reward_scales["tracking_lin_vel"]
         ):
-            self.command_ranges.lin_vel_x[0] = float(np.clip(
-                self.command_ranges.lin_vel_x[0] - 0.5, -self.command_config.max_curriculum, 0.0
-            ))
-            self.command_ranges.lin_vel_x[1] = float(np.clip(
-                self.command_ranges.lin_vel_x[1] + 0.5, 0.0, self.command_config.max_curriculum
-            ))
+            self.command_ranges.lin_vel_x[0] = float(
+                np.clip(self.command_ranges.lin_vel_x[0] - 0.5, -self.command_config.max_curriculum, 0.0)
+            )
+            self.command_ranges.lin_vel_x[1] = float(
+                np.clip(self.command_ranges.lin_vel_x[1] + 0.5, 0.0, self.command_config.max_curriculum)
+            )
 
     def _get_noise_scale_vec(self):
         """Sets a vector used to scale the noise added to the observations.
@@ -1311,7 +1332,6 @@ class LeggedRobot(BaseEnv):
         sphere_geom = gymutil.WireframeSphereGeometry(0.5, 4, 4, None, color=(0, 1, 0))
         sphere_pose = gymapi.Transform(gymapi.Vec3(x, y, z), r=None)
         gymutil.draw_lines(sphere_geom, self.gym, self.viewer, self.envs[0], sphere_pose)
-        
 
     def draw_spheres(self, x, y, z, reset=True, id=0, color=(1, 1, 0)):
         # heights = torch.clip(self.root_states[:, 2].unsqueeze(1) - 0.5 - measured_heights, -1, 1.) * self.obs_scales.height_measurements
@@ -1463,7 +1483,7 @@ class LeggedRobot(BaseEnv):
     def _reward_tracking_angular_velocity_new(self):
         current_velocity = self.base_ang_vel[:, 2]  # (num_envs, )
         desired_velocity = self.commands[:, 2]
-
+        
         desired_velocity_norm = torch.abs(desired_velocity)
         current_velocity_norm = torch.abs(current_velocity)
 
@@ -1631,7 +1651,7 @@ class LeggedRobot(BaseEnv):
 
     def _reward_action_norm(self):
         return torch.norm(self.actions, dim=1)
-
+    
     def _reward_consistency(self):
         c = self.tbai_ocs2_interface.get_consistency_reward().clone()
         self.tbai_ocs2_interface.get_consistency_reward()[:] = 0.0
@@ -1639,28 +1659,28 @@ class LeggedRobot(BaseEnv):
 
     def _reward_foot_position_tracking(self):
         eps = 1e-5
-
+        
         apply_reward = (torch.norm(self.contact_forces[:, self.feet_indices, :3], dim=-1) >= 1.0).float()
-        # print(apply_reward.shape)
-        # print(self.tracking_reward_ready.shape)
+        #print(apply_reward.shape)
+        #print(self.tracking_reward_ready.shape)
         apply_reward *= self.tracking_reward_ready
-        self.tracking_reward_ready *= 1.0 - apply_reward
+        self.tracking_reward_ready *= (1.0 - apply_reward)
 
         tt = torch.logical_and(self.aa, self.bb)
 
-        lf_foot_positions = self.lf_foot_position[:, :2]
+        lf_foot_positions = self.lf_foot_position[:,:2]
         lf_foot_positions_desired = self.tbai_ocs2_interface.get_planar_footholds()[:, 0:2]
         lf_diff = (lf_foot_positions_desired - lf_foot_positions).square().sum(dim=1) + eps
 
-        lh_foot_positions = self.lh_foot_position[:, :2]
+        lh_foot_positions = self.lh_foot_position[:,:2]
         lh_foot_positions_desired = self.tbai_ocs2_interface.get_planar_footholds()[:, 2:4]
         lh_diff = (lh_foot_positions_desired - lh_foot_positions).square().sum(dim=1) + eps
 
-        rf_foot_positions = self.rf_foot_position[:, :2]
+        rf_foot_positions = self.rf_foot_position[:,:2]
         rf_foot_positions_desired = self.tbai_ocs2_interface.get_planar_footholds()[:, 4:6]
         rf_diff = (rf_foot_positions_desired - rf_foot_positions).square().sum(dim=1) + eps
 
-        rh_foot_positions = self.rh_foot_position[:, :2]
+        rh_foot_positions = self.rh_foot_position[:,:2]
         rh_foot_positions_desired = self.tbai_ocs2_interface.get_planar_footholds()[:, 6:8]
         rh_diff = (rh_foot_positions_desired - rh_foot_positions).square().sum(dim=1) + eps
 
@@ -1670,12 +1690,10 @@ class LeggedRobot(BaseEnv):
         self.bb[tt] = False
 
         return -reward
-
+    
     def _reward_exp_base_position(self):
         base_position = self.root_states[:, :3]
-        base_position_desired = self.tbai_ocs2_interface.get_desired_base_positions().to(
-            self.device
-        )  # TODO: Why to(device)? Should be already on device
+        base_position_desired = self.tbai_ocs2_interface.get_desired_base_positions().to(self.device)  # TODO: Why to(device)? Should be already on device
 
         sigma = 1200.0
         # print(base_position_desired[0])
@@ -1688,16 +1706,17 @@ class LeggedRobot(BaseEnv):
     def _reward_exp_base_linear_velocity(self):
         base_velocity = self.root_states[:, 7:10]
         base_velocity_desired = self.tbai_ocs2_interface.get_desired_base_linear_velocities().to(self.device)
-
+    
         # print("Current base velocity:", base_velocity[0])
         # print("Desired base velocity:", base_velocity_desired[0])
         # print()
+
 
         sigma = 10.0
         diff = (base_velocity - base_velocity_desired).square().sum(dim=1)
         reward = torch.exp(-sigma * diff)
         return reward
-
+    
     def _reward_exp_base_orientation(self):
         base_orientation = self.root_states[:, 3:7]
         base_orientation_desired = self.tbai_ocs2_interface.get_desired_base_orientations().to(self.device)
@@ -1714,7 +1733,7 @@ class LeggedRobot(BaseEnv):
         sigma = 90.0
         reward = torch.exp(-sigma * diff)
         return reward
-
+    
     def _reward_exp_base_angular_velocity(self):
         base_angular_velocity = self.root_states[:, 10:13]
         base_angular_velocity_desired = self.tbai_ocs2_interface.get_desired_base_angular_velocities().to(self.device)
@@ -1723,32 +1742,60 @@ class LeggedRobot(BaseEnv):
         diff = (base_angular_velocity - base_angular_velocity_desired).square().sum(dim=1)
         reward = torch.exp(-sigma * diff)
         return reward
+    
+    def _reward_exp_base_linear_acceleration(self):
+        base_acceleration = (self.root_states[:, 7:10] - self.last_base_lin_vel) / self.dt
+        base_acceleration_desired = self.tbai_ocs2_interface.get_desired_base_linear_accelerations().to(self.device)
 
+        sigma = 0.05
+        diff = (base_acceleration - base_acceleration_desired).square().sum(dim=1)
+        reward = torch.exp(-sigma * diff)
+        return reward
+    
+    def _reward_exp_base_angular_acceleration(self):
+        base_angular_acceleration = (self.root_states[:, 10:13] - self.last_base_ang_vel) / self.dt
+        base_angular_acceleration_desired = self.tbai_ocs2_interface.get_desired_base_angular_accelerations().to(self.device)
+
+        sigma = 0.005
+        diff = (base_angular_acceleration - base_angular_acceleration_desired).square().sum(dim=1)
+        reward = torch.exp(-sigma * diff)
+        return reward
+    
     def _reward_foot_power(self):
         lf_velocity = self.lf_foot_velocity
-        lf_force = self.contact_forces[:, self.feet_indices[0], :]
+        lf_force = self.contact_forces[:, self.feet_indices[0], :] * self.obs_scales.contact_forces
         lf_power = (lf_velocity * lf_force).norm(dim=1)
 
         lh_velocity = self.lh_foot_velocity
-        lh_force = self.contact_forces[:, self.feet_indices[1], :]
+        lh_force = self.contact_forces[:, self.feet_indices[1], :] * self.obs_scales.contact_forces
         lh_power = (lh_velocity * lh_force).norm(dim=1)
 
         rf_velocity = self.rf_foot_velocity
-        rf_force = self.contact_forces[:, self.feet_indices[2], :]
+        rf_force = self.contact_forces[:, self.feet_indices[2], :] * self.obs_scales.contact_forces
         rf_power = (rf_velocity * rf_force).norm(dim=1)
 
         rh_velocity = self.rh_foot_velocity
-        rh_force = self.contact_forces[:, self.feet_indices[3], :]
+        rh_force = self.contact_forces[:, self.feet_indices[3], :] * self.obs_scales.contact_forces
         rh_power = (rh_velocity * rh_force).norm(dim=1)
 
         return (lf_power + lh_power + rf_power + rh_power).view(-1)
-
+    
     def _reward_z_height(self):
         desired_height = 0.55
         current_height = self.root_states[:, 2]
         diff = (desired_height - current_height).square()
 
+
         return (-diff) * (1.0 - self.ck)
+
+    def _reward_follow_joint_trajectory(self):
+        # Penalize deviation from joint trajectory
+
+        des = self.tbai_ocs2_interface.get_current_desired_joint_positions()
+        cur = self.dof_pos
+
+        error = (des - cur).square().sum(dim=1)
+        return error
 
     def update_curriculum(self):
         CURRICULUM_UPDATES = 10000.0

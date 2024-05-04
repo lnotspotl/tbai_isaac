@@ -14,8 +14,9 @@ class CentralPatternGenerator:
     def step(self, dt):
         self.time += dt
 
-    def get_observation(self):
-        phases = self.compute_phases()
+    def get_observation(self, phases=None):
+        if phases is None:
+            phases = self.compute_phases()
         return torch.cat([phases.cos(), phases.sin()], dim=-1)
 
     def compute_phases(self, phase_offsets=None):
@@ -33,8 +34,9 @@ class CentralPatternGenerator:
             env_idxs = slice(0, self.n_envs)
         self.time[env_idxs] = 0.0
 
-    def leg_heights(self, phase_offsets=None):
-        phases = self.compute_phases(phase_offsets)
+    def leg_heights(self, phase_offsets=None, phases=None):
+        if phases is None:
+            phases = self.compute_phases(phase_offsets)
         heights = torch.zeros_like(phases, device=self.device)
 
         # swing - going up

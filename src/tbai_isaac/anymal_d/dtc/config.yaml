@@ -5,8 +5,8 @@ environment:
   name: "anymal_d" 
   env:
     num_envs: 2048
-    num_observations: 107
-    num_privileged_observations: 119
+    num_observations: 115
+    num_privileged_observations: 127
     env_spacing: 3.0
     num_actions: 12
     episode_length_s: 20  # seconds
@@ -39,8 +39,8 @@ environment:
     resampling_time: 10 # seconds
     heading_command: False
     ranges:
-      lin_vel_x: [-0.50, 0.51] # min max [m/s]
-      lin_vel_y: [-0.5, 0.5] # min max [m/s]
+      lin_vel_x: [-0.51, 0.51] # min max [m/s]
+      lin_vel_y: [-0.3, 0.3] # min max [m/s]
       ang_vel_yaw: [-0.5, 0.5] # min max [rad/s]
       heading: [-3.14, 3.14]
 
@@ -79,11 +79,11 @@ environment:
     clip_actions: 100.0
 
   domain_randomization:
-    randomize_friction: False
+    randomize_friction: True
     friction_range: [0.5, 1.2]
-    randomize_base_mass: False
-    added_mass_range: [-5, 5]
-    push_robots: False
+    randomize_base_mass: True
+    added_mass_range: [-7, 7]
+    push_robots: True
     push_interval_s: 15 # sencods
     max_push_vel_xy: 1.0 # m/s
 
@@ -138,24 +138,27 @@ environment:
       exp_base_orientation: 1.0
       exp_base_linear_velocity: 2.0
       exp_base_angular_velocity: 1.0
-      foot_power: -0.00
+      exp_base_linear_acceleration: 1.0
+      exp_base_angular_acceleration: 1.0
+      foot_power: -0.3
       ang_vel_xy: 0.0
       orientation: -0.
       torques: -0.00001
       dof_vel: -0.00
       dof_acc: -1.0e-6
       base_height: 0.0
-      feet_air_time:  0.0
+      feet_air_time:  1.0
       collision: -0.0
       stumble: 0.0
       action_rate: -0.02
       stand_still: 0.0
       smoothness: -0.000
-      swing_height: 0.0
+      swing_height: -0.003
       action_norm: -0.0005
-      consistency: 20.0
+      consistency: 30.0
       foot_position_tracking: 1.0
       z_height: 10.0
+      follow_joint_trajectory: -0.6
 
   init_state:
     pos: [0.0, 0.0, 0.6] # x,y,z [m]
@@ -213,5 +216,5 @@ ppo:
 
   runner:
     num_steps_per_env: 24
-    max_iterations: 1500
+    max_iterations: 15000
     save_interval: 50
