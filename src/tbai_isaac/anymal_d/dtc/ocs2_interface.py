@@ -1,7 +1,7 @@
-import ig_interface
+import tbai_ocs2_interface
 
 
-def get_interface(num_envs, torch, rviz_visualize=False):
+def get_interface(num_envs, torch, rviz_visualize=False, num_threads=5):
     task_file = "/home/kuba/fun/ocs2_project/src/ocs2_fun/dependencies/ocs2/ocs2_robotic_examples/ocs2_legged_robot/config/mpc/task.info"
     urdf_file = (
         "/home/kuba/fun/ocs2_project/src/ocs2_fun/dependencies/ocs2_robotic_assets/resources/anymal_d/urdf/anymal.urdf"
@@ -9,9 +9,8 @@ def get_interface(num_envs, torch, rviz_visualize=False):
     reference_file = "/home/kuba/fun/ocs2_project/src/ocs2_fun/dependencies/ocs2/ocs2_robotic_examples/ocs2_legged_robot/config/command/reference.info"
     gait_file = "/home/kuba/fun/ocs2_project/src/ocs2_fun/dependencies/ocs2/ocs2_robotic_examples/ocs2_legged_robot/config/command/gait.info"
     gait = "trot"
-    num_threads = 1
 
-    ig = ig_interface.TbaiIsaacGymInterface(
+    ig = tbai_ocs2_interface.TbaiIsaacGymInterface(
         task_file,
         urdf_file,
         reference_file,

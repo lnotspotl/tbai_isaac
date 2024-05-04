@@ -9,7 +9,7 @@ from tbai_isaac.common.utils import parse_args
 from tbai_isaac.ppo.coach import Coach
 
 
-def train(args):
+def export(args):
     config = load_config(args.config)
 
     config.environment.env.num_envs = min(config.environment.env.num_envs, 5)
@@ -52,4 +52,4 @@ def train(args):
 
 if __name__ == "__main__":
     args = parse_args()
-    train(args)
+    export(args)

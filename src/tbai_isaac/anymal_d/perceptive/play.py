@@ -11,7 +11,7 @@ from tbai_isaac.common.utils import parse_args, set_seed, store_config
 from tbai_isaac.ppo.coach import Coach
 
 
-def train(args):
+def play(args):
     config = load_config(args.config)
     config.environment.env.num_envs = min(config.environment.env.num_envs, 50)
     config.environment.terrain.num_rows = 5
@@ -37,7 +37,7 @@ def train(args):
 
     actor_critic = TeacherNetwork(config)
 
-    coach = Coach(env, config.ppo, actor_critic, "./logs", "cuda")
+    coach = Coach(env, config.ppo, actor_critic, "./logs", writer_type="none")
     coach.load(model_path)
 
     policy = coach.get_inference_policy()
@@ -52,4 +52,4 @@ def train(args):
 
 if __name__ == "__main__":
     args = parse_args()
-    train(args)
+    play(args)

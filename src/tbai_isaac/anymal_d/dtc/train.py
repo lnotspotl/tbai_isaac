@@ -13,7 +13,7 @@ def train(args):
     if args.max_iterations is None:
         args.max_iterations = config.ppo.runner.max_iterations
 
-    env = LeggedRobot(config, args.headless)
+    env = LeggedRobot(config, args.headless, ig_threads=5)
 
     actor_critic = AgentNetwork(config)
 

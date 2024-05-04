@@ -1,4 +1,4 @@
-from int import get_interface
+from ocs2_interface import get_interface
 import os
 from collections import OrderedDict
 
@@ -20,7 +20,7 @@ from tbai_isaac.common.config import select
 
 
 class LeggedRobot(BaseEnv):
-    def __init__(self, yaml_cfg, headless):
+    def __init__(self, yaml_cfg, headless, ig_threads):
         """Parses the provided config file,
             calls create_sim() (which creates, simulation, terrain and environments),
             initilizes pytorch buffers used during training
@@ -85,17 +85,17 @@ class LeggedRobot(BaseEnv):
 
         print("Creating interface")
 
-        self.rviz_visualize = True
-        self.ig_interface = get_interface(self.num_envs, torch, self.rviz_visualize)
+        self.rviz_visualize = False
+        self.tbai_ocs2_interface = get_interface(self.num_envs, torch, self.rviz_visualize)
 
         print("Interface created")
 
-        self.ig_interface.reset_all_solvers(self.current_time)
+        self.tbai_ocs2_interface.reset_all_solvers(self.current_time)
         print("Solvers reset")
-        self.ig_interface.update_all_states(torch.zeros(self.num_envs, 12 + 12))
+        self.tbai_ocs2_interface.update_all_states(torch.zeros(self.num_envs, 12 + 12))
 
         print("States updated")
-        self.time_till_optimization = self.ig_interface.updated_in_seconds()
+        self.time_till_optimization = self.tbai_ocs2_interface.updated_in_seconds()
 
         print(self.privileged_obs_buf)
         print("BUUG" * 10)
@@ -200,35 +200,35 @@ class LeggedRobot(BaseEnv):
         self.time_till_optimization -= self.dt
 
         optimized_indices = (self.time_till_optimization <= 0.0).nonzero(as_tuple=False).flatten()
-        self.ig_interface.update_states(self.get_ocs2_state(optimized_indices), optimized_indices)
-        self.ig_interface.optimize_trajectories(self.current_time, optimized_indices)
+        self.tbai_ocs2_interface.update_states(self.get_ocs2_state(optimized_indices), optimized_indices)
+        self.tbai_ocs2_interface.optimize_trajectories(self.current_time, optimized_indices)
 
         mask = torch.zeros(self.num_envs, 4, dtype=torch.bool, device=self.device)
         mask[optimized_indices] = True
-        mask = torch.logical_and(mask, torch.logical_not(self.ig_interface.get_desired_contacts()))
+        mask = torch.logical_and(mask, torch.logical_not(self.tbai_ocs2_interface.get_desired_contacts()))
 
         self.aa[mask] = True
         self.aa[optimized_indices][
-            torch.logical_not(self.ig_interface.get_desired_contacts())[optimized_indices, :]
+            torch.logical_not(self.tbai_ocs2_interface.get_desired_contacts())[optimized_indices, :]
         ] = True
         self.bb[:, :] = torch.logical_and(
-            torch.logical_not(self.ig_interface.get_desired_contacts()),
+            torch.logical_not(self.tbai_ocs2_interface.get_desired_contacts()),
             torch.logical_and(
-                self.ig_interface.get_time_left_in_phase() <= 0.025, self.ig_interface.get_time_left_in_phase() >= 0.0
+                self.tbai_ocs2_interface.get_time_left_in_phase() <= 0.025, self.tbai_ocs2_interface.get_time_left_in_phase() >= 0.0
             ),
         ).float()
 
-        self.ig_interface.update_optimized_states(self.current_time)
-        self.ig_interface.update_desired_contacts(self.current_time, torch.arange(0, self.num_envs))
-        self.ig_interface.update_time_left_in_phase(self.current_time, torch.arange(0, self.num_envs))
-        self.ig_interface.update_desired_joint_angles(self.current_time, torch.arange(0, self.num_envs))
-        self.ig_interface.update_current_desired_joint_angles(
+        self.tbai_ocs2_interface.update_optimized_states(self.current_time)
+        self.tbai_ocs2_interface.update_desired_contacts(self.current_time, torch.arange(0, self.num_envs))
+        self.tbai_ocs2_interface.update_time_left_in_phase(self.current_time, torch.arange(0, self.num_envs))
+        self.tbai_ocs2_interface.update_desired_joint_angles(self.current_time, torch.arange(0, self.num_envs))
+        self.tbai_ocs2_interface.update_current_desired_joint_angles(
             self.current_time + self.dt, torch.arange(0, self.num_envs)
         )
 
         # New functions
-        self.ig_interface.update_desired_base(self.current_time + self.dt, torch.arange(0, self.num_envs))
-        self.ig_interface.move_desired_base_to_gpu()
+        self.tbai_ocs2_interface.update_desired_base(self.current_time + self.dt, torch.arange(0, self.num_envs))
+        self.tbai_ocs2_interface.move_desired_base_to_gpu()
 
 
         # Update last action history buffer
@@ -242,7 +242,7 @@ class LeggedRobot(BaseEnv):
             ocs2_state = self.get_ocs2_state(torch.arange(env_id, env_id+2))[0]
             current_time = self.current_time
             current_obs = self.obs_buf[env_id]
-            self.ig_interface.visualize(current_time, ocs2_state, env_id, current_obs)
+            self.tbai_ocs2_interface.visualize(current_time, ocs2_state, env_id, current_obs)
 
         # Compute observation for each observation manager
         for observation_manager in self.observation_managers.values():
@@ -303,9 +303,9 @@ class LeggedRobot(BaseEnv):
 
         self._resample_commands(env_ids)
 
-        self.ig_interface.reset_solvers(self.current_time, env_ids)
-        self.ig_interface.set_current_command(self.commands[env_ids], env_ids)
-        self.ig_interface.update_states(self.get_ocs2_state(env_ids), env_ids)
+        self.tbai_ocs2_interface.reset_solvers(self.current_time, env_ids)
+        self.tbai_ocs2_interface.set_current_command(self.commands[env_ids], env_ids)
+        self.tbai_ocs2_interface.update_states(self.get_ocs2_state(env_ids), env_ids)
 
         # reset buffers
         self.last_actions[env_ids] = 0.0
@@ -404,7 +404,7 @@ class LeggedRobot(BaseEnv):
 
         for i in range(4):
             temp = torch.zeros((self.num_envs, 3), device=self.device)
-            temp[:, 0:2] = self.ig_interface.get_planar_footholds()[:, i * 2 : i * 2 + 2]
+            temp[:, 0:2] = self.tbai_ocs2_interface.get_planar_footholds()[:, i * 2 : i * 2 + 2]
             temp[:, 0:2] -= self.root_states[:, 0:2]
             temp = quat_apply_yaw_inverse(self.base_quat, temp)
             planar_footholds[:, i * 2 : i * 2 + 2] += temp[:, :2]
@@ -412,18 +412,18 @@ class LeggedRobot(BaseEnv):
         # print(f"Planar footholds: {planar_footholds}")
 
         # Desired joint positions
-        desired_joint_angles = self.ig_interface.get_desired_joint_positions() - self.dof_pos
+        desired_joint_angles = self.tbai_ocs2_interface.get_desired_joint_positions() - self.dof_pos
         # print(f"Desired joint positions: {desired_joint_angles}")
 
         # Current desired joint positions
-        current_desired_joint_angles = self.ig_interface.get_current_desired_joint_positions() - self.default_dof_pos
+        current_desired_joint_angles = self.tbai_ocs2_interface.get_current_desired_joint_positions() - self.default_dof_pos
 
         # Desired contact state
-        desired_contacts = self.ig_interface.get_desired_contacts()
+        desired_contacts = self.tbai_ocs2_interface.get_desired_contacts()
         # print(f"Desired contact state: {desired_contacts}")
 
         # Time left in phase
-        time_left_in_phase = self.ig_interface.get_time_left_in_phase()
+        time_left_in_phase = self.tbai_ocs2_interface.get_time_left_in_phase()
         # print(f"Time left in phase: {time_left_in_phase}")
 
         # Command
@@ -432,28 +432,28 @@ class LeggedRobot(BaseEnv):
 
         # Desired base position
         desired_base_pos = quat_apply_yaw_inverse(
-            self.base_quat, self.ig_interface.get_desired_base_positions() - self.root_states[:, 0:3]
+            self.base_quat, self.tbai_ocs2_interface.get_desired_base_positions() - self.root_states[:, 0:3]
         )
         # print(f"Desired base position: {desired_base_pos}")
 
         base_orientation = self.root_states[:, 3:7]
-        base_orientation_desired = self.ig_interface.get_desired_base_orientations().to(self.device)
+        base_orientation_desired = self.tbai_ocs2_interface.get_desired_base_orientations().to(self.device)
 
         orientation_diff = quat_mul(base_orientation_desired, quat_conjugate(base_orientation))
 
         # Desired base linear velocity
-        desired_base_lin_vel = self.ig_interface.get_desired_base_linear_velocities()
+        desired_base_lin_vel = self.tbai_ocs2_interface.get_desired_base_linear_velocities()
         desired_base_lin_vel = quat_apply(quat_conjugate(self.base_quat), desired_base_lin_vel)
 
         # Desired base angular velocity
-        desired_base_ang_vel = self.ig_interface.get_desired_base_angular_velocities()
+        desired_base_ang_vel = self.tbai_ocs2_interface.get_desired_base_angular_velocities()
         desired_base_ang_vel = quat_apply(quat_conjugate(self.base_quat), desired_base_ang_vel)
 
         #### TODO: Add
-        desid_base_lin_acc = self.ig_interface.get_desired_base_linear_accelerations()
+        desid_base_lin_acc = self.tbai_ocs2_interface.get_desired_base_linear_accelerations()
         desid_base_lin_acc = quat_apply(quat_conjugate(self.base_quat), desid_base_lin_acc)
 
-        desid_base_ang_acc = self.ig_interface.get_desired_base_angular_accelerations()
+        desid_base_ang_acc = self.tbai_ocs2_interface.get_desired_base_angular_accelerations()
         desid_base_ang_acc = quat_apply(quat_conjugate(self.base_quat), desid_base_ang_acc)
 
         self.obs_buf = torch.cat(
@@ -479,11 +479,6 @@ class LeggedRobot(BaseEnv):
             ],
             dim=-1,
         )
-
-        torch.set_printoptions(precision=4, sci_mode=False)
-        print("======================== START")
-        print(self.obs_buf[0])
-        print("======================== STOP")
 
         self.privileged_obs_buf = self.obs_buf.clone()
         for i in range(4):
@@ -609,9 +604,9 @@ class LeggedRobot(BaseEnv):
             .flatten()
         )
         self._resample_commands(env_ids)
-        self.ig_interface.set_current_command(self.commands[env_ids], env_ids)
-        self.ig_interface.update_states(self.get_ocs2_state(env_ids), env_ids)
-        self.ig_interface.optimize_trajectories(self.current_time, env_ids)
+        self.tbai_ocs2_interface.set_current_command(self.commands[env_ids], env_ids)
+        self.tbai_ocs2_interface.update_states(self.get_ocs2_state(env_ids), env_ids)
+        self.tbai_ocs2_interface.optimize_trajectories(self.current_time, env_ids)
         if self.command_config.heading_command:
             forward = quat_apply(self.base_quat, self.forward_vec)
             heading = torch.atan2(forward[:, 1], forward[:, 0])
@@ -680,7 +675,7 @@ class LeggedRobot(BaseEnv):
             )
 
             # torques = (
-            #     self.p_gains * (actions_scaled + self.ig_interface.get_current_desired_joint_positions() - self.dof_pos) - self.d_gains * self.dof_vel
+            #     self.p_gains * (actions_scaled + self.tbai_ocs2_interface.get_current_desired_joint_positions() - self.dof_pos) - self.d_gains * self.dof_vel
             # )
         elif control_type == "V":
             torques = (
@@ -761,9 +756,9 @@ class LeggedRobot(BaseEnv):
         self.gym.set_actor_root_state_tensor(self.sim, gymtorch.unwrap_tensor(self.root_states))
 
         env_ids = torch.arange(0, self.num_envs)
-        self.ig_interface.set_current_command(self.commands[env_ids], env_ids)
-        self.ig_interface.update_states(self.get_ocs2_state(env_ids), env_ids)
-        self.ig_interface.optimize_trajectories(self.current_time, env_ids)
+        self.tbai_ocs2_interface.set_current_command(self.commands[env_ids], env_ids)
+        self.tbai_ocs2_interface.update_states(self.get_ocs2_state(env_ids), env_ids)
+        self.tbai_ocs2_interface.optimize_trajectories(self.current_time, env_ids)
 
     def _update_terrain_curriculum(self, env_ids):
         """Implements the game-inspired curriculum.
@@ -802,12 +797,12 @@ class LeggedRobot(BaseEnv):
             torch.mean(self.episode_sums["tracking_lin_vel"][env_ids]) / self.max_episode_length
             > 0.5 * self.reward_scales["tracking_lin_vel"]
         ):
-            self.command_ranges.lin_vel_x[0] = np.clip(
+            self.command_ranges.lin_vel_x[0] = float(np.clip(
                 self.command_ranges.lin_vel_x[0] - 0.5, -self.command_config.max_curriculum, 0.0
-            )
-            self.command_ranges.lin_vel_x[1] = np.clip(
+            ))
+            self.command_ranges.lin_vel_x[1] = float(np.clip(
                 self.command_ranges.lin_vel_x[1] + 0.5, 0.0, self.command_config.max_curriculum
-            )
+            ))
 
     def _get_noise_scale_vec(self):
         """Sets a vector used to scale the noise added to the observations.
@@ -1291,11 +1286,11 @@ class LeggedRobot(BaseEnv):
 
         for j in range(min(5, self.num_envs)):
             for i in range(4):
-                desired_foothold = self.ig_interface.get_planar_footholds()[j, i * 2 : i * 2 + 2]
+                desired_foothold = self.tbai_ocs2_interface.get_planar_footholds()[j, i * 2 : i * 2 + 2]
                 desired_foothold = desired_foothold  # - self.root_states[j, :2]
 
                 # temp = torch.zeros((1, 3), device=self.device)
-                # temp[0, 0:2] = self.ig_interface.get_planar_footholds()[0, i*2:i*2+2]
+                # temp[0, 0:2] = self.tbai_ocs2_interface.get_planar_footholds()[0, i*2:i*2+2]
                 # temp[0, 0:2] -= self.root_states[0, 0:2]
                 # temp = quat_apply_yaw_inverse(self.base_quat[0].view(1, -1), temp)
 
@@ -1638,8 +1633,8 @@ class LeggedRobot(BaseEnv):
         return torch.norm(self.actions, dim=1)
 
     def _reward_consistency(self):
-        c = self.ig_interface.get_consistency_reward().clone()
-        self.ig_interface.get_consistency_reward()[:] = 0.0
+        c = self.tbai_ocs2_interface.get_consistency_reward().clone()
+        self.tbai_ocs2_interface.get_consistency_reward()[:] = 0.0
         return c * self.ck
 
     def _reward_foot_position_tracking(self):
@@ -1654,19 +1649,19 @@ class LeggedRobot(BaseEnv):
         tt = torch.logical_and(self.aa, self.bb)
 
         lf_foot_positions = self.lf_foot_position[:, :2]
-        lf_foot_positions_desired = self.ig_interface.get_planar_footholds()[:, 0:2]
+        lf_foot_positions_desired = self.tbai_ocs2_interface.get_planar_footholds()[:, 0:2]
         lf_diff = (lf_foot_positions_desired - lf_foot_positions).square().sum(dim=1) + eps
 
         lh_foot_positions = self.lh_foot_position[:, :2]
-        lh_foot_positions_desired = self.ig_interface.get_planar_footholds()[:, 2:4]
+        lh_foot_positions_desired = self.tbai_ocs2_interface.get_planar_footholds()[:, 2:4]
         lh_diff = (lh_foot_positions_desired - lh_foot_positions).square().sum(dim=1) + eps
 
         rf_foot_positions = self.rf_foot_position[:, :2]
-        rf_foot_positions_desired = self.ig_interface.get_planar_footholds()[:, 4:6]
+        rf_foot_positions_desired = self.tbai_ocs2_interface.get_planar_footholds()[:, 4:6]
         rf_diff = (rf_foot_positions_desired - rf_foot_positions).square().sum(dim=1) + eps
 
         rh_foot_positions = self.rh_foot_position[:, :2]
-        rh_foot_positions_desired = self.ig_interface.get_planar_footholds()[:, 6:8]
+        rh_foot_positions_desired = self.tbai_ocs2_interface.get_planar_footholds()[:, 6:8]
         rh_diff = (rh_foot_positions_desired - rh_foot_positions).square().sum(dim=1) + eps
 
         reward = (torch.stack([lf_diff.log(), lh_diff.log(), rf_diff.log(), rh_diff.log()], dim=-1) * tt).sum(dim=-1)
@@ -1678,7 +1673,7 @@ class LeggedRobot(BaseEnv):
 
     def _reward_exp_base_position(self):
         base_position = self.root_states[:, :3]
-        base_position_desired = self.ig_interface.get_desired_base_positions().to(
+        base_position_desired = self.tbai_ocs2_interface.get_desired_base_positions().to(
             self.device
         )  # TODO: Why to(device)? Should be already on device
 
@@ -1692,7 +1687,7 @@ class LeggedRobot(BaseEnv):
 
     def _reward_exp_base_linear_velocity(self):
         base_velocity = self.root_states[:, 7:10]
-        base_velocity_desired = self.ig_interface.get_desired_base_linear_velocities().to(self.device)
+        base_velocity_desired = self.tbai_ocs2_interface.get_desired_base_linear_velocities().to(self.device)
 
         # print("Current base velocity:", base_velocity[0])
         # print("Desired base velocity:", base_velocity_desired[0])
@@ -1705,7 +1700,7 @@ class LeggedRobot(BaseEnv):
 
     def _reward_exp_base_orientation(self):
         base_orientation = self.root_states[:, 3:7]
-        base_orientation_desired = self.ig_interface.get_desired_base_orientations().to(self.device)
+        base_orientation_desired = self.tbai_ocs2_interface.get_desired_base_orientations().to(self.device)
 
         xyz1 = base_orientation[:, 0:3]
         w2 = base_orientation_desired[:, 3]
@@ -1722,7 +1717,7 @@ class LeggedRobot(BaseEnv):
 
     def _reward_exp_base_angular_velocity(self):
         base_angular_velocity = self.root_states[:, 10:13]
-        base_angular_velocity_desired = self.ig_interface.get_desired_base_angular_velocities().to(self.device)
+        base_angular_velocity_desired = self.tbai_ocs2_interface.get_desired_base_angular_velocities().to(self.device)
 
         sigma = 1.0
         diff = (base_angular_velocity - base_angular_velocity_desired).square().sum(dim=1)
