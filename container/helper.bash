@@ -99,12 +99,7 @@ if [[ $1 == "--install_singularity" ]]; then
 fi
 
 if [[ $1 == "--pack_singularity" ]]; then
-  tar -cf tbai_isaac.tar.gz $SCRIPT_DIR/.. # Tar without compression - faster
-  exit
-fi
-
-if [[ $1 == "--unpack_singularity" ]]; then
-  tar -xf tbai_isaac.tar.gz
+  tar -cf tbai_isaac_sing.tar.gz $SCRIPT_DIR/.. # Tar without compression - faster
   exit
 fi
 
@@ -124,7 +119,7 @@ if [[ $1 == "--pack_builder" ]]; then
     exit
   fi
 
-  tar -cf tbai_isaac.tar.gz ${TBAIISAAC_DIR}
+  tar -cf tbai_isaac_builder.tar.gz ${TBAIISAAC_DIR}
   exit
 fi
 
