@@ -49,8 +49,10 @@ if [[ $1 == "--run_singularity" ]]; then
   SINGULARITYIMAGE_NAME="tbai_isaac.sif"
   singularity exec --nv --writable --no-home --containall \
   --bind ..:/home/tbai/tbai_isaac/ \
+  --bind ./tbai_bindings:/home/tbai/tbai_bindings/src/tbai_bindings \
   --bind ./tmp:/tmp \
-   $SINGULARITYIMAGE_NAME bash -c "cd /home/tbai && rm ./setup.bash && ln -s ./tbai_isaac/container/setup.bash . && bash"
+  --bind ./wormhole:/home/tbai/wormhole \
+  $SINGULARITYIMAGE_NAME bash -c "cd /home/tbai && echo $(pwd) && rm ./setup.bash && ln -s ./tbai_isaac/container/setup.bash . && echo done && bash"
   # --nv ... gives access to nvidia gpus
 
   rm -rf ./tmp
