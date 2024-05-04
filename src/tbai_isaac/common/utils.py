@@ -83,6 +83,7 @@ def set_seed(seed):
 
 def store_config(args, config):
     log_dir = args.log_dir
+    os.makedirs(log_dir, exist_ok=True)
     config_file = os.path.join(log_dir, "config.yaml")
     ac.store_config(config, config_file)
 
