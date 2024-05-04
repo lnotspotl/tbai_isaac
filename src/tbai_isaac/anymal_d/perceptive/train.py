@@ -16,7 +16,7 @@ def train(args):
     actor_critic = TeacherNetwork(config)
 
     create_dir(args.log_dir)
-    coach = Coach(env, config.ppo, actor_critic, args.log_dir, args.writer_type)
+    coach = Coach(env, config, actor_critic, args.log_dir, args.writer_type)
 
     coach.train(args.max_iterations, True)
 

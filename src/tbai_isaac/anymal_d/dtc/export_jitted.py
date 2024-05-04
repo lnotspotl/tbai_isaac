@@ -20,7 +20,7 @@ def export(args):
     config.environment.domain_randomization.randomize_friction = False
     config.environment.domain_randomization.push_robots = False
     if args.max_iterations is None:
-        args.max_iterations = config.ppo.runner.max_iterations
+        args.max_iterations = config.runner.max_iterations
 
     env = LeggedRobot(config, args.headless)
 
@@ -29,7 +29,7 @@ def export(args):
 
     actor_critic = AgentNetwork(config)
 
-    coach = Coach(env, config.ppo, actor_critic, "./logs", "cuda")
+    coach = Coach(env, config, actor_critic, "./logs", "cuda")
     coach.load(model_in)
 
     class ExportedActor(nn.Module):

@@ -37,7 +37,7 @@ def play(args):
 
     actor_critic = TeacherNetwork(config)
 
-    coach = Coach(env, config.ppo, actor_critic, "./logs", writer_type="none")
+    coach = Coach(env, config, actor_critic, "./logs", writer_type="none")
     coach.load(model_path)
 
     policy = coach.get_inference_policy()
