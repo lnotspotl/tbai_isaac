@@ -389,17 +389,17 @@ class LeggedRobot(BaseEnv):
         # print(f"Base angular velocity: {self.base_ang_vel}")
 
         # Projected gravity
-        gravity_noise = self.generate_uniform(size=(self.num_envs, 3), low=-0.05, high=0.05, device=self.device) * 0
+        gravity_noise = self.generate_uniform(size=(self.num_envs, 3), low=-0.05, high=0.05, device=self.device)
         projected_gravity = self.projected_gravity + gravity_noise
         # print(f"Projected gravity: {projected_gravity}")
 
         # Joint positions
-        dof_pos_noise = self.generate_uniform(size=(self.num_envs, 12), low=-0.01, high=0.01, device=self.device) * 0
+        dof_pos_noise = self.generate_uniform(size=(self.num_envs, 12), low=-0.01, high=0.01, device=self.device)
         dof_pos = (self.dof_pos + dof_pos_noise - d_pos) * self.obs_scales.dof_pos
         # print(f"Joint positions: {dof_pos}")
 
         # Joint velocities
-        dof_vel_noise = self.generate_uniform(size=(self.num_envs, 12), low=-0.3, high=0.3, device=self.device) * 0
+        dof_vel_noise = self.generate_uniform(size=(self.num_envs, 12), low=-0.3, high=0.3, device=self.device)
         dof_vel = (self.dof_vel + dof_vel_noise) * self.obs_scales.dof_vel
         # print(f"Joint velocities: {dof_vel}")
 
@@ -409,7 +409,7 @@ class LeggedRobot(BaseEnv):
 
         # Planar footholds
         planar_footholds_noise = (
-            self.generate_uniform(size=(self.num_envs, 4 * 2), low=-0.01, high=0.01, device=self.device) * 0
+            self.generate_uniform(size=(self.num_envs, 4 * 2), low=-0.01, high=0.01, device=self.device)
         )
         planar_footholds = torch.zeros((self.num_envs, 4 * 2), device=self.device) + planar_footholds_noise
 

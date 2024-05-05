@@ -18,8 +18,7 @@ class Writer:
 
             wandb_dir = os.path.join(log_dir, "wandb")
             os.makedirs(wandb_dir, exist_ok=True)
-            wandb.init(project="tbai", dir=wandb_dir)
-            wandb.config(dict(config))
+            wandb.init(project="tbai", dir=wandb_dir, config=dict(config))
 
             self.wandb = wandb
             self.buffer = dict()
