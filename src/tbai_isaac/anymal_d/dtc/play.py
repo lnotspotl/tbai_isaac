@@ -16,13 +16,13 @@ from tbai_isaac.common.utils import parse_args, set_seed, store_config
 
 def play(args):
     config = load_config(args.config)
-    config.environment.env.num_envs = min(config.environment.env.num_envs, 50)
+    config.environment.env.num_envs = min(config.environment.env.num_envs, 2)
     config.environment.terrain.num_rows = 5
     config.environment.terrain.num_cols = 5
     config.environment.terrain.curriculum = False
     config.environment.noise.add_noise = False
-    config.environment.domain_randomization.randomize_friction = False
-    config.environment.domain_randomization.push_robots = False
+    config.environment.domain_randomization.randomize_friction = True
+    config.environment.domain_randomization.push_robots = True
 
     # Set seed
     if "seed" not in config:
@@ -32,15 +32,13 @@ def play(args):
         seed = config["seed"]
         set_seed(seed)
 
-    store_config(args, config)
-
     env = LeggedRobot(config, args.headless, 3)
     assert args.model is not None, "Model must be provided"
     model_path = os.path.join(args.log_dir, args.model)
 
     actor_critic = AgentNetwork(config)
 
-    coach = Coach(env, config, actor_critic, "./logs", writer_type="none")
+    coach = Coach(env, config, actor_critic, args.log_dir, writer_type="none")
     coach.load(model_path)
 
     policy = coach.get_inference_policy()
