@@ -5,10 +5,11 @@ source $HOME/.bashrc
 
 echo "Installing tbai_bindings..."
 cd $HOME/tbai_bindings && source devel/setup.bash
-catkin build tbai_bindings
+rm $HOME/tbai_isaac/src/tbai_isaac/anymal_d/dtc/tbai_ocs2_interface.cpython-38-x86_64-linux-gnu.so
+cd $HOME/tbai_bindings/src/tbai_bindings/dependencies && rm libtorch && ln -s ${HOME}/libtorch .
+cd $HOME/tbai_bindings && catkin build tbai_bindings
 
 echo "Creating symlink for tbai_ocs2_interface..."
-rm $HOME/tbai_isaac/src/tbai_isaac/anymal_d/dtc/tbai_ocs2_interface.cpython-38-x86_64-linux-gnu.so
 ln -s $(pwd)/devel/lib/tbai_ocs2_interface.cpython-38-x86_64-linux-gnu.so $HOME/tbai_isaac/src/tbai_isaac/anymal_d/dtc
 
 echo "Installing tbai_isaac..."

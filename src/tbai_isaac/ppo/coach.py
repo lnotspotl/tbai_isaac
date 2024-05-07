@@ -12,9 +12,9 @@ from .algorithm import PPO
 
 
 class Coach:
-    def __init__(self, env, train_cfg, ac, log_dir, writer_type="tensorboard"):
-        self.cfg = train_cfg["runner"]
-        self.alg_cfg = train_cfg["algorithm"]
+    def __init__(self, env, cfg, ac, log_dir, writer_type="tensorboard"):
+        self.cfg = cfg.ppo["runner"]
+        self.alg_cfg = cfg.ppo["algorithm"]
         device = "cuda"
         self.device = device
         self.env = env
@@ -38,7 +38,7 @@ class Coach:
 
         # Log
         self.log_dir = log_dir
-        self.writer = Writer(type=writer_type, log_dir=self.log_dir)
+        self.writer = Writer(type=writer_type, log_dir=self.log_dir, config=cfg)
 
         self.tot_timesteps = 0
         self.tot_time = 0

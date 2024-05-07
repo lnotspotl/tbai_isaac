@@ -52,6 +52,12 @@ def parse_args():
             "default": "none",
             "options": ["wandb", "tensorboard", "none"],
             "help": "Writer type for logging.",
+        },
+        {
+            "name": "--tbai_ocs2_threads",
+            "type": int,
+            "default": 8,
+            "help": "Number of threads to use for the ocs2 tbai interface.",
         }
     ]
 

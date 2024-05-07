@@ -5,6 +5,10 @@ import os
 URDF_PATH = os.path.join(os.path.dirname(__file__), "resources/urdf/anymal.urdf")
 URDF_FOLDER = os.path.join(os.path.dirname(__file__), "resources")
 
+MPC_GAIT_FILE = os.path.join(os.path.dirname(__file__), "resources/dtc/mpc_gait.info")
+MPC_TASK_FILE = os.path.join(os.path.dirname(__file__), "resources/dtc/mpc_task.info")
+MPC_REFERENCE_FILE = os.path.join(os.path.dirname(__file__), "resources/dtc/mpc_reference.info")
+
 BASE_NAME = "base"
 FOOT_NAMES = ["LF_FOOT", "LH_FOOT", "RF_FOOT", "RH_FOOT"]
 JOINT_NAMES = [

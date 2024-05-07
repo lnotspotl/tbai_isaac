@@ -16,6 +16,9 @@ RUN pip3 --no-cache-dir install networkx==3.1  # This is because otherwise torch
 RUN pip3 install --no-cache-dir torch==2.0.1 --index-url https://download.pytorch.org/whl/cu118
 RUN pip3 install --no-cache-dir wandb tensorboard 
 RUN pip3 install --no-cache-dir numpy==1.20.0 
+RUN apt install git -y
+RUN pip3 install --no-cache-dir "git+https://github.com/facebookresearch/pytorch3d.git"
+
 
 # Install ROS
 RUN echo "deb http://packages.ros.org/ros/ubuntu focal main" > /etc/apt/sources.list.d/ros-latest.list
@@ -47,11 +50,11 @@ ENV EXTRA_TORCH_LIBS=${HOME}/libtorch/libtorch_python.so
 RUN echo "export CMAKE_PREFIX_PATH=\$CMAKE_PREFIX_PATH:${HOME}/libtorch" >> ${HOME}/.bashrc && source ${HOME}/.bashrc
 RUN echo "export LD_LIBRARY_PATH=\$LD_LIBRARY_PATH:${HOME}/libtorch/lib" >> ${HOME}/.bashrc && source ${HOME}/.bashrc
 RUN mkdir -p ${HOME}/tbai_bindings/src && cd ${HOME}/tbai_bindings && catkin init && catkin config -DCMAKE_BUILD_TYPE=Release
-RUN apt install -y libglpk-dev ros-noetic-pybind11-catkin libeigen3-dev ros-noetic-pinocchio git ros-noetic-interactive-markers ros-noetic-tf ros-noetic-urdf ros-noetic-kdl-parser ros-noetic-robot-state-publisher vim
+RUN apt install -y libglpk-dev ros-noetic-pybind11-catkin libeigen3-dev ros-noetic-pinocchio ros-noetic-interactive-markers ros-noetic-tf ros-noetic-urdf ros-noetic-kdl-parser ros-noetic-robot-state-publisher vim
 COPY ./tbai_bindings ${HOME}/tbai_bindings/src/tbai_bindings
 RUN pip3 install --no-cache-dir pybind11 
 RUN apt install python3-catkin-tools python3-catkin -y
-RUN source ${HOME}/.bashrc && cd ${HOME}/tbai_bindings && source /opt/ros/noetic/setup.bash && export CMAKE_PREFIX_PATH=$CMAKE_PREFIX_PATH:/root/libtorch && catkin build tbai_bindings 
+RUN source ${HOME}/.bashrc && cd ${HOME}/tbai_bindings && source /opt/ros/noetic/setup.bash && export CMAKE_PREFIX_PATH=$CMAKE_PREFIX_PATH:${HOME}/libtorch && rm -rf /home/tbai/tbai_bindings/src/tbai_bindings/dependencies/libtorch || true && ln -s ${HOME}/libtorch /home/tbai/tbai_bindings/src/tbai_bindings/dependencies/ &&catkin build tbai_bindings 
 
 # Source tbai_bindings
 RUN echo "source ${HOME}/tbai_bindings/devel/setup.bash" >> ${HOME}/.bashrc && source ${HOME}/.bashrc

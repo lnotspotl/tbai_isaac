@@ -4,7 +4,7 @@ import os
 
 
 class Writer:
-    def __init__(self, type, log_dir):
+    def __init__(self, type, log_dir, config):
         assert type in ["tensorboard", "wandb", "none"], f"Invalid writer type: {type}"
         self.type = type
 
@@ -18,7 +18,7 @@ class Writer:
 
             wandb_dir = os.path.join(log_dir, "wandb")
             os.makedirs(wandb_dir, exist_ok=True)
-            wandb.init(project="tbai", dir=wandb_dir)
+            wandb.init(project="tbai", dir=wandb_dir, config=dict(config))
 
             self.wandb = wandb
             self.buffer = dict()

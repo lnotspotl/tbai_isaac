@@ -49,8 +49,10 @@ if [[ $1 == "--run_singularity" ]]; then
   SINGULARITYIMAGE_NAME="tbai_isaac.sif"
   singularity exec --nv --writable --no-home --containall \
   --bind ..:/home/tbai/tbai_isaac/ \
+  --bind ./tbai_bindings:/home/tbai/tbai_bindings/src/tbai_bindings \
   --bind ./tmp:/tmp \
-   $SINGULARITYIMAGE_NAME bash -c "cd /home/tbai && rm ./setup.bash && ln -s ./tbai_isaac/container/setup.bash . && bash"
+  --bind ./wormhole:/home/tbai/wormhole \
+  $SINGULARITYIMAGE_NAME bash -c "cd /home/tbai && echo $(pwd) && rm ./setup.bash && ln -s ./tbai_isaac/container/setup.bash . && echo done && bash"
   # --nv ... gives access to nvidia gpus
 
   rm -rf ./tmp
@@ -97,12 +99,7 @@ if [[ $1 == "--install_singularity" ]]; then
 fi
 
 if [[ $1 == "--pack_singularity" ]]; then
-  tar -cf tbai_isaac.tar.gz $SCRIPT_DIR/.. # Tar without compression - faster
-  exit
-fi
-
-if [[ $1 == "--unpack_singularity" ]]; then
-  tar -xf tbai_isaac.tar.gz
+  tar -cf tbai_isaac_sing.tar.gz $SCRIPT_DIR/.. # Tar without compression - faster
   exit
 fi
 
@@ -122,7 +119,7 @@ if [[ $1 == "--pack_builder" ]]; then
     exit
   fi
 
-  tar -cf tbai_isaac.tar.gz ${TBAIISAAC_DIR}
+  tar -cf tbai_isaac_builder.tar.gz ${TBAIISAAC_DIR}
   exit
 fi
 

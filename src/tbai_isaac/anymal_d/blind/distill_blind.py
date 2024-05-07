@@ -180,7 +180,7 @@ def distill(args):
     model_path = "./logs/model_3000.pt"
 
     actor_critic = TeacherNetwork(config)
-    coach = Coach(env, config.ppo, actor_critic, "./logs", "cuda")
+    coach = Coach(env, config, actor_critic, "./logs", "cuda")
     coach.load(model_path)
 
     actor_critic = coach.alg.actor_critic

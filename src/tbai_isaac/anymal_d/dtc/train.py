@@ -25,11 +25,11 @@ def train(args):
 
     store_config(args, config)
 
-    env = LeggedRobot(config, args.headless, ig_threads=8)
+    env = LeggedRobot(config, args.headless, ocs2_interface_threads=args.tbai_ocs2_threads)
 
     actor_critic = AgentNetwork(config)
 
-    coach = Coach(env, config.ppo, actor_critic, args.log_dir, writer_type="none")
+    coach = Coach(env, config, actor_critic, args.log_dir, writer_type=args.writer_type)
 
     coach.train(args.max_iterations, True)
 
