@@ -644,6 +644,7 @@ class LeggedRobot(BaseEnv):
             # RH foot position error
             rh_foot_position_noise = self.generate_uniform(size=(self.num_envs, 3), low=-0.06, high=0.06, device=self.device)
             rh_foot_pos_error = self.rh_foot_position - self.tbai_ocs2_interface.get_desired_foot_positions()[:, 9:12] 
+            # rh_foot_pos_error = quat_apply(quat_conjugate(self.base_quat), rh_foot_pos_error) # TODO: Add this, was not used during training
 
             # LF foot velocity error
             lf_foot_velocity_noise = self.generate_uniform(size=(self.num_envs, 3), low=-0.20, high=0.20, device=self.device)
