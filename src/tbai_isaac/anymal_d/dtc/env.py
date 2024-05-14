@@ -49,9 +49,14 @@ class LeggedRobot(BaseEnv):
         self.noise_config = ac.get_noise_config(self.anymal_config)
         self.sim_config = ac.get_sim_config(self.anymal_config)
 
+        self.add_height_samples = True
+
         self.current_time = 0.0
 
+        self.sampling_positions_local = None 
+
         self.step_counter = 0
+        self.noise_scale = float(1.0)
 
         self.observation_managers: OrderedDict[str, ObservationManager] = OrderedDict()
 
@@ -62,17 +67,20 @@ class LeggedRobot(BaseEnv):
 
         self.sim_params = ac.get_sim_params(self.anymal_config)
         self.height_samples = None
-        self.debug_viz = True
+        self.debug_viz = False
         self.init_done = False
         self._parse_cfg()
 
+        print("HER1")
         num_obs = self.env_config.num_observations
         num_privileged_obs = self.env_config.num_privileged_observations
         if num_privileged_obs is None:
-            num_privileged_obs = 0
+            num_privileged_obs = 0  
         num_actions = self.env_config.num_actions
         device = "cuda"
         num_envs = self.env_config.num_envs
+
+        print("HER2")
 
         super().__init__(
             num_obs=num_obs,
@@ -85,6 +93,7 @@ class LeggedRobot(BaseEnv):
             physics_engine=gymapi.SIM_PHYSX,
             sim_device="cuda",
         )
+        print("HER3")
 
         print("Creating interface")
 
@@ -99,7 +108,6 @@ class LeggedRobot(BaseEnv):
 
         self.tbai_ocs2_interface.reset_all_solvers(self.current_time)
         print("Solvers reset")
-        self.tbai_ocs2_interface.update_all_states(torch.zeros(self.num_envs, 12 + 12))
 
         print("States updated")
         self.time_till_optimization = self.tbai_ocs2_interface.updated_in_seconds()
@@ -133,6 +141,7 @@ class LeggedRobot(BaseEnv):
 
         self.aa = torch.zeros(self.num_envs, 4, dtype=torch.bool, device=self.device)
         self.bb = torch.zeros(self.num_envs, 4, dtype=torch.bool, device=self.device)
+        self.reference_angle = torch.zeros(self.num_envs, device=self.device)
 
     def add_observation_manager(self, name: str, observation_manager: ObservationManager):
         if name in self.observation_managers:
@@ -172,6 +181,61 @@ class LeggedRobot(BaseEnv):
             self.privileged_obs_buf = torch.clip(self.privileged_obs_buf, -clip_obs, clip_obs)
 
         return self.obs_buf, self.privileged_obs_buf, self.rew_buf, self.reset_buf, self.extras
+    
+    def generate_pts(self, optimized_indices):
+        n_indices = optimized_indices.shape[0]
+
+        length_x = 2.5
+        length_y = 2.5
+        resolution = 0.1
+        Nx = int(length_x / resolution)
+        Ny = int(length_y / resolution)
+
+        if self.sampling_positions_local is None:
+            x_coords = torch.linspace(-1, 1, Nx) * length_x / 2
+            y_coords = torch.linspace(-1, 1, Ny) * length_y / 2
+            self.sampling_positions_local = torch.zeros((Nx, Ny, 3), device=self.device)
+            # Reversed because we want to go from positive to negative values
+            for i, x in enumerate(reversed(x_coords)):
+                for j, y in enumerate(reversed(y_coords)):
+                    ix = y 
+                    iy = x
+                    self.sampling_positions_local[i, j, 0] = ix
+                    self.sampling_positions_local[i, j, 1] = iy
+                    self.sampling_positions_local[i, j, 2] = 0.0
+                
+            self.sampling_positions_local = self.sampling_positions_local.view(1, -1, 3)
+
+        base_coords = self.root_states[optimized_indices, 0:3].view(n_indices, 1, 3)
+        sampling_positions = base_coords + self.sampling_positions_local
+        sampling_positions[:, :, 2] = 0.0
+        if self.terrain_config.mesh_type != "plane":
+
+
+            points = sampling_positions.clone() + self.terrain_config.border_size
+            points = (points / self.terrain_config.horizontal_scale).long()
+            px = points[:, :, 0].view(-1)
+            py = points[:, :, 1].view(-1)
+            px = torch.clip(px, 0, self.height_samples.shape[0] - 2)
+            py = torch.clip(py, 0, self.height_samples.shape[1] - 2)
+            heights1 = self.height_samples[px, py] * self.terrain_config.vertical_scale
+            sampling_positions[:, :, 2] = heights1.view(n_indices, Nx * Ny)
+
+        return sampling_positions, length_x, length_y, resolution
+
+    def generate_flattened_maps(self, optimized_indices):
+        sampling_positions, length_x, length_y, resolution = self.generate_pts(optimized_indices)
+        return sampling_positions[:, :, 2].cpu(), length_x, length_y, resolution
+    
+    def update_flattened_maps(self, optimized_indices):
+        # Update maps prior to optimization
+        flattened_maps, length_x, length_y, resolution = self.generate_flattened_maps(optimized_indices)
+        flattened_maps = flattened_maps.cpu()
+        x_coords = self.root_states[optimized_indices, 0].cpu()
+        y_coords = self.root_states[optimized_indices, 1].cpu()
+        optimized_indices_cpu = optimized_indices.cpu()
+        self.tbai_ocs2_interface.set_maps_from_flattened(flattened_maps, length_x, length_y, resolution, x_coords, y_coords, optimized_indices_cpu)
+
 
     def post_physics_step(self):
         """check terminations, compute observations and rewards
@@ -210,7 +274,8 @@ class LeggedRobot(BaseEnv):
         self.time_till_optimization -= self.dt
 
         optimized_indices = (self.time_till_optimization <= 0.0).nonzero(as_tuple=False).flatten()
-        self.tbai_ocs2_interface.update_states(self.get_ocs2_state(optimized_indices), optimized_indices)
+        self.tbai_ocs2_interface.update_states_perceptive(self.get_ocs2_state_perceptive(optimized_indices), optimized_indices)
+        self.update_flattened_maps(optimized_indices)
         self.tbai_ocs2_interface.optimize_trajectories(self.current_time, optimized_indices)
 
         mask = torch.zeros(self.num_envs, 4, dtype=torch.bool, device=self.device)
@@ -229,7 +294,7 @@ class LeggedRobot(BaseEnv):
             ),
         ).float()
 
-        self.tbai_ocs2_interface.update_optimized_states(self.current_time)
+        self.tbai_ocs2_interface.update_optimized_states(self.current_time) # TODO: This is of no use
         self.tbai_ocs2_interface.update_desired_contacts(self.current_time, torch.arange(0, self.num_envs))
         self.tbai_ocs2_interface.update_time_left_in_phase(self.current_time, torch.arange(0, self.num_envs))
         self.tbai_ocs2_interface.update_desired_joint_angles(self.current_time, torch.arange(0, self.num_envs))
@@ -254,9 +319,11 @@ class LeggedRobot(BaseEnv):
 
         if self.rviz_visualize:
             env_id = 0
-            ocs2_state = self.get_ocs2_state(torch.arange(env_id, env_id + 2))[0]
+            ocs2_state = self.get_ocs2_state_perceptive(torch.arange(env_id, env_id + 2))[0]
             current_time = self.current_time
             current_obs = self.obs_buf[env_id]
+
+            self.update_flattened_maps(torch.arange(env_id, env_id + 2))
             self.tbai_ocs2_interface.visualize(current_time, ocs2_state, env_id, current_obs)
 
         # Compute observation for each observation manager
@@ -311,6 +378,8 @@ class LeggedRobot(BaseEnv):
         if self.command_config.curriculum and (self.common_step_counter % self.max_episode_length == 0):
             self.update_command_curriculum(env_ids)
 
+        self.reference_angle[env_ids] = 0.0
+
         # reset robot states
         self._reset_dofs(env_ids)
         self._reset_root_states(env_ids)
@@ -320,7 +389,7 @@ class LeggedRobot(BaseEnv):
 
         self.tbai_ocs2_interface.reset_solvers(self.current_time, env_ids)
         self.tbai_ocs2_interface.set_current_command(self.commands[env_ids], env_ids)
-        self.tbai_ocs2_interface.update_states(self.get_ocs2_state(env_ids), env_ids)
+        self.tbai_ocs2_interface.update_states_perceptive(self.get_ocs2_state_perceptive(env_ids), env_ids)
 
         # reset buffers
         self.last_actions[env_ids] = 0.0
@@ -381,24 +450,62 @@ class LeggedRobot(BaseEnv):
         diff = high - low
         out = torch.randn(*size) * diff + low
         return out.to(device)
+    
+
+    def sample_at_position(self, x, y):
+        if self.terrain_config.mesh_type == "plane":
+            return 0.0
+        xp = x + self.terrain_config.border_size
+        yp = y + self.terrain_config.border_size
+        xp = xp / self.terrain_config.horizontal_scale
+        yp = yp / self.terrain_config.horizontal_scale
+        z = self.height_samples[xp.long(), yp.long()] * self.terrain_config.vertical_scale
+        return z
+
+    def generate_height_samples(self):
+        diffs = list()
+        foot_positions = [
+            self.lf_foot_position,
+            self.rf_foot_position,
+            self.lh_foot_position,
+            self.rh_foot_position,
+        ]
+        desired_foot_positions = [
+            self.tbai_ocs2_interface.get_planar_footholds()[:, 0:2],
+            self.tbai_ocs2_interface.get_planar_footholds()[:, 2:4],
+            self.tbai_ocs2_interface.get_planar_footholds()[:, 4:6],
+            self.tbai_ocs2_interface.get_planar_footholds()[:, 6:8],
+        ]
+
+        for fp, dfp in zip(foot_positions, desired_foot_positions):
+            dx = fp[:, 0] - dfp[:, 0]
+            dy = fp[:, 1] - dfp[:, 1]
+
+            a = torch.linspace(0, 1, 10).to(self.device)
+            a = a.view(1, -1)
+            x = fp[:, 0].view(-1, 1) + a * dx.view(-1, 1)
+            y = fp[:, 1].view(-1, 1) + a * dy.view(-1, 1)
+
+            n_envs = x.shape[0]
+            n_samples = x.shape[1]
+
+            heights = self.sample_at_position(x.view(-1), y.view(-1)).view(n_envs, n_samples)
+            zdiffs = heights - fp[:, 2].view(-1, 1)
+            diffs.append(zdiffs)
+        
+        return torch.stack(diffs, dim=1)
 
     def compute_observations(self):
         d_pos = self.default_dof_pos if self.aik.tt is None else self.aik.tt
 
         # Base linear velocity
-        lin_vel_noise = (
-            self.generate_uniform(size=(self.num_envs, 3), low=-0.12, high=0.12, device=self.device)
-            * self.obs_scales.lin_vel
-        )
+        lin_vel_noise = self.generate_uniform(size=(self.num_envs, 3), low=-0.12, high=0.12, device=self.device) * self.obs_scales.lin_vel
         lin_vel = lin_vel = self.base_lin_vel * self.obs_scales.lin_vel
 
         # print(f"Base linear velocity: {self.base_lin_vel}")
 
         # Base angular velocity
-        ang_vel_noise = (
-            self.generate_uniform(size=(self.num_envs, 3), low=-0.22, high=0.22, device=self.device)
-            * self.obs_scales.ang_vel
-        )
+        ang_vel_noise = self.generate_uniform(size=(self.num_envs, 3), low=-0.22, high=0.22, device=self.device) * self.obs_scales.ang_vel
         ang_vel = self.base_ang_vel * self.obs_scales.ang_vel
         # print(f"Base angular velocity: {self.base_ang_vel}")
 
@@ -408,18 +515,12 @@ class LeggedRobot(BaseEnv):
         # print(f"Projected gravity: {projected_gravity}")
 
         # Joint positions
-        dof_pos_noise = (
-            self.generate_uniform(size=(self.num_envs, 12), low=-0.1, high=0.1, device=self.device)
-            * self.obs_scales.dof_pos
-        )
+        dof_pos_noise = self.generate_uniform(size=(self.num_envs, 12), low=-0.1, high=0.1, device=self.device) * self.obs_scales.dof_pos
         dof_pos = (self.dof_pos - d_pos) * self.obs_scales.dof_pos
         # print(f"Joint positions: {dof_pos}")
 
         # Joint velocities
-        dof_vel_noise = (
-            self.generate_uniform(size=(self.num_envs, 12), low=-1.5, high=1.5, device=self.device)
-            * self.obs_scales.dof_vel
-        )
+        dof_vel_noise = self.generate_uniform(size=(self.num_envs, 12), low=-1.5, high=1.5, device=self.device) * self.obs_scales.dof_vel
         dof_vel = self.dof_vel * self.obs_scales.dof_vel
         # print(f"Joint velocities: {dof_vel}")
 
@@ -428,18 +529,16 @@ class LeggedRobot(BaseEnv):
         # print(f"Past actions: {actions}")
 
         # Planar footholds
-        planar_footholds_noise = self.generate_uniform(
-            size=(self.num_envs, 4 * 2), low=-0.06, high=0.06, device=self.device
+        planar_footholds_noise = (
+            self.generate_uniform(size=(self.num_envs, 4 * 2), low=-0.06, high=0.06, device=self.device)
         )
         planar_footholds = torch.zeros((self.num_envs, 4 * 2), device=self.device)
 
-        for i, leg_pos in enumerate(
-            [self.lf_foot_position, self.rf_foot_position, self.lh_foot_position, self.rh_foot_position]
-        ):
+        for i, leg_pos in enumerate([self.lf_foot_position, self.rf_foot_position, self.lh_foot_position, self.rh_foot_position]):
             temp = torch.zeros((self.num_envs, 3), device=self.device)
             temp[:, 0:2] = self.tbai_ocs2_interface.get_planar_footholds()[:, i * 2 : i * 2 + 2]
             temp[:, 0:2] -= leg_pos[:, 0:2]
-            temp = quat_apply_yaw_inverse(self.base_quat, temp)
+            temp = quat_apply(quat_conjugate(self.base_quat), temp)
             planar_footholds[:, i * 2 : i * 2 + 2] += temp[:, :2]
 
         # print(f"Planar footholds: {planar_footholds}")
@@ -464,8 +563,8 @@ class LeggedRobot(BaseEnv):
         # print(f"Command: {command}")
 
         # Desired base position
-        desired_base_pos = quat_apply_yaw_inverse(
-            self.base_quat, self.tbai_ocs2_interface.get_desired_base_positions() - self.root_states[:, 0:3]
+        desired_base_pos = quat_apply(
+            quat_conjugate(self.base_quat), self.tbai_ocs2_interface.get_desired_base_positions() - self.root_states[:, 0:3]
         )
         # print(f"Desired base position: {desired_base_pos}")
 
@@ -499,14 +598,14 @@ class LeggedRobot(BaseEnv):
 
         self.obs_buf = torch.cat(
             [
-                lin_vel + lin_vel_noise * self.actor_noise,
-                ang_vel + ang_vel_noise * self.actor_noise,
-                projected_gravity + gravity_noise * self.actor_noise,
+                lin_vel + lin_vel_noise * self.noise_scale,
+                ang_vel + ang_vel_noise * self.noise_scale,
+                projected_gravity + gravity_noise * self.noise_scale,
                 command,  # No noise
-                dof_pos + dof_pos_noise * self.actor_noise,
-                dof_vel + dof_vel_noise * self.actor_noise,
-                actions,  # No noise
-                planar_footholds + planar_footholds_noise * self.actor_noise,
+                dof_pos + dof_pos_noise * self.noise_scale,
+                dof_vel + dof_vel_noise * self.noise_scale,
+                actions, # No noise
+                planar_footholds + planar_footholds_noise * self.noise_scale,
                 desired_joint_angles,
                 current_desired_joint_angles,
                 desired_contacts,
@@ -522,101 +621,66 @@ class LeggedRobot(BaseEnv):
             dim=-1,
         )
 
+        if self.add_height_samples:
+            height_samples_noise = self.generate_uniform(size=(self.num_envs, 40), low=-0.06, high=0.06, device=self.device) * self.obs_scales.height_measurements
+            height_samples = self.generate_height_samples().view(self.num_envs, 40) * self.obs_scales.height_measurements
+
         if self.control_config.control_type == "CPG_WBC":
             # LF foot position error
-            lf_foot_position_noise = self.generate_uniform(
-                size=(self.num_envs, 3), low=-0.06, high=0.06, device=self.device
-            )
-            lf_foot_pos_error = (
-                self.lf_foot_position
-                - self.tbai_ocs2_interface.get_desired_foot_positions()[:, :3]
-            )
-            lf_foot_pos_error = quat_apply_yaw_inverse(self.base_quat, lf_foot_pos_error)
+            lf_foot_position_noise = self.generate_uniform(size=(self.num_envs, 3), low=-0.06, high=0.06, device=self.device)
+            lf_foot_pos_error = self.lf_foot_position - self.tbai_ocs2_interface.get_desired_foot_positions()[:, :3]
+            lf_foot_pos_error = quat_apply(quat_conjugate(self.base_quat), lf_foot_pos_error)
 
             # RF foot position error
-            rf_foot_position_noise = self.generate_uniform(
-                size=(self.num_envs, 3), low=-0.06, high=0.06, device=self.device
-            )
-            rf_foot_pos_error = (
-                self.rf_foot_position
-                - self.tbai_ocs2_interface.get_desired_foot_positions()[:, 3:6]
-            )
-            rf_foot_pos_error = quat_apply_yaw_inverse(self.base_quat, rf_foot_pos_error)
+            rf_foot_position_noise = self.generate_uniform(size=(self.num_envs, 3), low=-0.06, high=0.06, device=self.device)
+            rf_foot_pos_error = self.rf_foot_position - self.tbai_ocs2_interface.get_desired_foot_positions()[:, 3:6] 
+            rf_foot_pos_error = quat_apply(quat_conjugate(self.base_quat), rf_foot_pos_error)
 
             # LH foot position error
-            lh_foot_position_noise = self.generate_uniform(
-                size=(self.num_envs, 3), low=-0.06, high=0.06, device=self.device
-            )
-            lh_foot_pos_error = (
-                self.lh_foot_position
-                - self.tbai_ocs2_interface.get_desired_foot_positions()[:, 6:9]
-            )
-            lh_foot_pos_error = quat_apply_yaw_inverse(self.base_quat, lh_foot_pos_error)
+            lh_foot_position_noise = self.generate_uniform(size=(self.num_envs, 3), low=-0.06, high=0.06, device=self.device)
+            lh_foot_pos_error = self.lh_foot_position - self.tbai_ocs2_interface.get_desired_foot_positions()[:, 6:9] 
+            lh_foot_pos_error = quat_apply(quat_conjugate(self.base_quat), lh_foot_pos_error)
 
             # RH foot position error
-            rh_foot_position_noise = self.generate_uniform(
-                size=(self.num_envs, 3), low=-0.06, high=0.06, device=self.device
-            )
-            rh_foot_pos_error = (
-                self.rh_foot_position
-                - self.tbai_ocs2_interface.get_desired_foot_positions()[:, 9:12]
-            )
-            rh_foot_pos_error = quat_apply_yaw_inverse(self.base_quat, rh_foot_pos_error)
+            rh_foot_position_noise = self.generate_uniform(size=(self.num_envs, 3), low=-0.06, high=0.06, device=self.device)
+            rh_foot_pos_error = self.rh_foot_position - self.tbai_ocs2_interface.get_desired_foot_positions()[:, 9:12] 
 
             # LF foot velocity error
-            lf_foot_velocity_noise = self.generate_uniform(
-                size=(self.num_envs, 3), low=-0.20, high=0.20, device=self.device
-            )
-            lf_foot_vel_error = (
-                self.lf_foot_velocity
-                - self.tbai_ocs2_interface.get_desired_foot_velocities()[:, :3]
-            )
-            lf_foot_vel_error = quat_apply_yaw_inverse(self.base_quat, lf_foot_vel_error)
+            lf_foot_velocity_noise = self.generate_uniform(size=(self.num_envs, 3), low=-0.20, high=0.20, device=self.device)
+            lf_foot_vel_error = self.lf_foot_velocity - self.tbai_ocs2_interface.get_desired_foot_velocities()[:, :3] 
+            lf_foot_vel_error = quat_apply(quat_conjugate(self.base_quat), lf_foot_vel_error)
 
             # RF foot velocity error
-            rf_foot_velocity_noise = self.generate_uniform(
-                size=(self.num_envs, 3), low=-0.20, high=0.20, device=self.device
-            )
-            rf_foot_vel_error = (
-                self.rf_foot_velocity
-                - self.tbai_ocs2_interface.get_desired_foot_velocities()[:, 3:6]
-            )
-            rf_foot_vel_error = quat_apply_yaw_inverse(self.base_quat, rf_foot_vel_error)
+            rf_foot_velocity_noise = self.generate_uniform(size=(self.num_envs, 3), low=-0.20, high=0.20, device=self.device)
+            rf_foot_vel_error = self.rf_foot_velocity - self.tbai_ocs2_interface.get_desired_foot_velocities()[:, 3:6] 
+            rf_foot_vel_error = quat_apply(quat_conjugate(self.base_quat), rf_foot_vel_error)
 
             # LH foot velocity error
-            lh_foot_velocity_noise = self.generate_uniform(
-                size=(self.num_envs, 3), low=-0.20, high=0.20, device=self.device
-            )
-            lh_foot_vel_error = (
-                self.lh_foot_velocity
-                - self.tbai_ocs2_interface.get_desired_foot_velocities()[:, 6:9]
-            )
-            lh_foot_vel_error = quat_apply_yaw_inverse(self.base_quat, lh_foot_vel_error)
+            lh_foot_velocity_noise = self.generate_uniform(size=(self.num_envs, 3), low=-0.20, high=0.20, device=self.device)
+            lh_foot_vel_error = self.lh_foot_velocity - self.tbai_ocs2_interface.get_desired_foot_velocities()[:, 6:9]
+            lh_foot_vel_error = quat_apply(quat_conjugate(self.base_quat), lh_foot_vel_error)
 
             # RH foot velocity error
-            rh_foot_velocity_noise = self.generate_uniform(
-                size=(self.num_envs, 3), low=-0.20, high=0.20, device=self.device
-            )
-            rh_foot_vel_error = (
-                self.rh_foot_velocity
-                - self.tbai_ocs2_interface.get_desired_foot_velocities()[:, 9:12]
-            )
-            rh_foot_vel_error = quat_apply_yaw_inverse(self.base_quat, rh_foot_vel_error)
+            rh_foot_velocity_noise = self.generate_uniform(size=(self.num_envs, 3), low=-0.20, high=0.20, device=self.device)
+            rh_foot_vel_error = self.rh_foot_velocity - self.tbai_ocs2_interface.get_desired_foot_velocities()[:, 9:12]
+            rh_foot_vel_error = quat_apply(quat_conjugate(self.base_quat), rh_foot_vel_error)
 
             self.obs_buf = torch.cat(
                 [
                     self.obs_buf,
-                    lf_foot_pos_error + lf_foot_position_noise * self.actor_noise,
-                    lh_foot_pos_error + lh_foot_position_noise * self.actor_noise,
-                    rf_foot_pos_error + rf_foot_position_noise * self.actor_noise,
-                    rh_foot_pos_error + rh_foot_position_noise * self.actor_noise,
-                    lf_foot_vel_error + lf_foot_velocity_noise * self.actor_noise,
-                    lh_foot_vel_error + lh_foot_velocity_noise * self.actor_noise,
-                    rf_foot_vel_error + rf_foot_velocity_noise * self.actor_noise,
-                    rh_foot_vel_error + rh_foot_velocity_noise * self.actor_noise,
-                ],
-                dim=-1,
+                    lf_foot_pos_error + lf_foot_position_noise * self.noise_scale,
+                    lh_foot_pos_error + lh_foot_position_noise * self.noise_scale,
+                    rf_foot_pos_error + rf_foot_position_noise * self.noise_scale,
+                    rh_foot_pos_error + rh_foot_position_noise * self.noise_scale,
+                    lf_foot_vel_error + lf_foot_velocity_noise * self.noise_scale,
+                    lh_foot_vel_error + lh_foot_velocity_noise * self.noise_scale,
+                    rf_foot_vel_error + rf_foot_velocity_noise * self.noise_scale,
+                    rh_foot_vel_error + rh_foot_velocity_noise * self.noise_scale,
+                ], dim=-1
             )
+
+            if self.add_height_samples:
+                self.obs_buf = torch.cat([self.obs_buf, height_samples + height_samples_noise * self.noise_scale], dim=-1)
 
         # Privileged observation == without noise
         self.privileged_obs_buf = torch.cat(
@@ -656,9 +720,11 @@ class LeggedRobot(BaseEnv):
                     lh_foot_vel_error,
                     rf_foot_vel_error,
                     rh_foot_vel_error,
-                ],
-                dim=-1,
+                ], dim=-1
             )
+
+        if self.add_height_samples:
+            self.privileged_obs_buf = torch.cat([self.privileged_obs_buf, height_samples], dim=-1)
 
         for i in range(4):
             contact_force_world = self.contact_forces[:, self.feet_indices[i], :]
@@ -685,6 +751,7 @@ class LeggedRobot(BaseEnv):
             self._create_heightfield()
         elif mesh_type == "trimesh":
             self._create_trimesh()
+            print("Created trimesh terrain")
         elif mesh_type is not None:
             raise ValueError("Terrain mesh type not recognised. Allowed types are [None, plane, heightfield, trimesh]")
         self._create_envs()
@@ -784,7 +851,8 @@ class LeggedRobot(BaseEnv):
         )
         self._resample_commands(env_ids)
         self.tbai_ocs2_interface.set_current_command(self.commands[env_ids], env_ids)
-        self.tbai_ocs2_interface.update_states(self.get_ocs2_state(env_ids), env_ids)
+        self.tbai_ocs2_interface.update_states_perceptive(self.get_ocs2_state_perceptive(env_ids), env_ids)
+        self.update_flattened_maps(env_ids)
         self.tbai_ocs2_interface.optimize_trajectories(self.current_time, env_ids)
         if self.command_config.heading_command:
             forward = quat_apply(self.base_quat, self.forward_vec)
@@ -942,7 +1010,7 @@ class LeggedRobot(BaseEnv):
 
         env_ids = torch.arange(0, self.num_envs)
         self.tbai_ocs2_interface.set_current_command(self.commands[env_ids], env_ids)
-        self.tbai_ocs2_interface.update_states(self.get_ocs2_state(env_ids), env_ids)
+        self.update_flattened_maps(env_ids)
         self.tbai_ocs2_interface.optimize_trajectories(self.current_time, env_ids)
 
     def _update_terrain_curriculum(self, env_ids):
@@ -1172,20 +1240,47 @@ class LeggedRobot(BaseEnv):
                     print(f"PD gain of joint {name} were not defined, setting them to zero")
         self.default_dof_pos = self.default_dof_pos.unsqueeze(0)
 
-    def get_ocs2_state(self, env_ids):
-        num_ids = env_ids.numel()
+    def module_angle_with_reference(self, zyx_angles, reference_angle):
+        if zyx_angles.shape[0] == 0:
+            return zyx_angles
 
-        # Placeholders for now, TODO: compute real v_com and L_com
-        v_com = self.root_states[env_ids][:, 7:10].cpu()  # x, y, z
-        L_com = torch.zeros(num_ids, 3).cpu()
-        pos_com = self.root_states[env_ids][:, [0, 1, 2]].cpu()  # x, y, z
-        ori_com = pytorch3d.transforms.matrix_to_euler_angles(
+        z = zyx_angles[:, 0]
+        lower_bound = reference_angle - torch.pi
+        upper_bound = reference_angle + torch.pi
+
+        ll = lower_bound + torch.fmod(z - lower_bound, 2.0 * torch.pi)
+        uu = upper_bound - torch.fmod(upper_bound - z, 2.0 * torch.pi)
+
+        z = torch.where(z > upper_bound, ll, z)
+        z = torch.where(z < lower_bound, uu, z)
+
+        zyx_angles[:, 0] = z
+        return zyx_angles
+    
+    def get_ocs2_state_perceptive(self, env_ids):
+        # Euler zyx angles
+        zyx_euler_angles = pytorch3d.transforms.matrix_to_euler_angles(
             pytorch3d.transforms.quaternion_to_matrix(self.root_states[env_ids][:, [6, 3, 4, 5]]),  # w, x, y, z,
             convention="ZYX",
-        ).cpu()
+        )
+        zyx_euler_angles = self.module_angle_with_reference(zyx_euler_angles, self.reference_angle[env_ids])
+        self.reference_angle[env_ids] = zyx_euler_angles[:, 0]
+        zyx_euler_angles = zyx_euler_angles.cpu()
+
+        # Position in world frame
+        pos_com = self.root_states[env_ids][:, [0, 1, 2]].cpu()
+
+        # Angular velocity in base frame
+        w_com = self.root_states[env_ids][:, 10:13]
+        w_com_local = quat_rotate_inverse(self.base_quat[env_ids], w_com).cpu()
+
+        # Linear velocity in base frame
+        v_com = self.root_states[env_ids][:, 7:10]
+        v_com_local = quat_rotate_inverse(self.base_quat[env_ids], v_com).cpu()
+
         joint_pos = self.dof_pos[env_ids].cpu()
 
-        return torch.cat((v_com, L_com, pos_com, ori_com, joint_pos), dim=1)
+        return torch.cat((zyx_euler_angles, pos_com, w_com_local, v_com_local, joint_pos), dim=1)
 
     def _prepare_reward_function(self):
         """Prepares a list of reward functions, whcih will be called to compute the total reward.
@@ -1263,6 +1358,7 @@ class LeggedRobot(BaseEnv):
         self.height_samples = (
             torch.tensor(self.terrain.heightsamples).view(self.terrain.tot_rows, self.terrain.tot_cols).to(self.device)
         )
+
 
     def _create_envs(self):
         """Creates environments:
@@ -1453,10 +1549,12 @@ class LeggedRobot(BaseEnv):
         self.gym.refresh_rigid_body_state_tensor(self.sim)
         sphere_geom = gymutil.WireframeSphereGeometry(0.02, 4, 4, None, color=(1, 1, 0))
 
+        env_pts = torch.arange(2).long()
+        sampling_positions, length_x, length_y, resolution = self.generate_pts(env_pts)
+
         for j in range(min(5, self.num_envs)):
             for i in range(4):
                 desired_foothold = self.tbai_ocs2_interface.get_planar_footholds()[j, i * 2 : i * 2 + 2]
-                desired_foothold = desired_foothold  # - self.root_states[j, :2]
 
                 # temp = torch.zeros((1, 3), device=self.device)
                 # temp[0, 0:2] = self.tbai_ocs2_interface.get_planar_footholds()[0, i*2:i*2+2]
@@ -1466,12 +1564,23 @@ class LeggedRobot(BaseEnv):
                 # # planar_footholds[:, i*2:i*2+2] = temp[:, :2]
                 # desired_foothold = temp[0, :2]
 
-                desired_foothold = desired_foothold.cpu()
-                x = desired_foothold[0]
-                y = desired_foothold[1]
-                z = 0.0
-                sphere_pose = gymapi.Transform(gymapi.Vec3(x, y, z), r=None)
-                gymutil.draw_lines(sphere_geom, self.gym, self.viewer, self.envs[0], sphere_pose)
+                if self.terrain_config.mesh_type != "plane":
+
+                    desired_foothold = desired_foothold.cpu()
+                    x = desired_foothold[0] 
+                    y = desired_foothold[1]
+                    xp, yp = (x + self.terrain_config.border_size)/self.terrain_config.horizontal_scale, (y + self.terrain_config.border_size)/self.terrain_config.horizontal_scale
+                    z = self.height_samples[int(xp), int(yp)] * self.terrain_config.vertical_scale
+                    sphere_pose = gymapi.Transform(gymapi.Vec3(x, y, z), r=None)
+                    gymutil.draw_lines(sphere_geom, self.gym, self.viewer, self.envs[0], sphere_pose)
+
+            if j == 0 and False:
+                for i in range(sampling_positions.shape[1]):
+                    x = sampling_positions[0].view(-1, 3)[i][0]
+                    y = sampling_positions[0].view(-1, 3)[i][1]
+                    z = sampling_positions[0].view(-1, 3)[i][2]
+                    sphere_pose = gymapi.Transform(gymapi.Vec3(x, y, z), r=None)
+                    gymutil.draw_lines(sphere_geom, self.gym, self.viewer, self.envs[0], sphere_pose)
 
         # Draw a sphere above the first robot
         x = self.root_states[0, 0]
@@ -1821,11 +1930,11 @@ class LeggedRobot(BaseEnv):
         lf_diff = (lf_foot_positions_desired - lf_foot_positions).square().sum(dim=1) + eps
 
         lh_foot_positions = self.lh_foot_position[:, :2]
-        lh_foot_positions_desired = self.tbai_ocs2_interface.get_planar_footholds()[:, 2:4]
+        lh_foot_positions_desired = self.tbai_ocs2_interface.get_planar_footholds()[:, 4:6]
         lh_diff = (lh_foot_positions_desired - lh_foot_positions).square().sum(dim=1) + eps
 
         rf_foot_positions = self.rf_foot_position[:, :2]
-        rf_foot_positions_desired = self.tbai_ocs2_interface.get_planar_footholds()[:, 4:6]
+        rf_foot_positions_desired = self.tbai_ocs2_interface.get_planar_footholds()[:, 2:4]
         rf_diff = (rf_foot_positions_desired - rf_foot_positions).square().sum(dim=1) + eps
 
         rh_foot_positions = self.rh_foot_position[:, :2]
@@ -1932,7 +2041,7 @@ class LeggedRobot(BaseEnv):
         return (lf_power + lh_power + rf_power + rh_power).view(-1)
 
     def _reward_z_height(self):
-        desired_height = 0.55
+        desired_height = 0.55 + self.sample_at_position(self.root_states[:, 0], self.root_states[:, 1])
         current_height = self.root_states[:, 2]
         diff = (desired_height - current_height).square()
 

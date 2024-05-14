@@ -50,14 +50,14 @@ class Terrain:
             (i, j) = np.unravel_index(k, (self.terrain_config.num_rows, self.terrain_config.num_cols))
 
             choice = np.random.uniform(0, 1)
-            difficulty = np.random.choice([0.5, 0.75, 0.9])
+            difficulty = np.random.choice([0.001, 0.15, 0.25])
             terrain = self.make_terrain(choice, difficulty)
             self.add_terrain_to_map(terrain, i, j)
 
     def curiculum(self):
         for j in range(self.terrain_config.num_cols):
             for i in range(self.terrain_config.num_rows):
-                difficulty = 1.0 * i / self.terrain_config.num_rows
+                difficulty = 0.3 * i / self.terrain_config.num_rows
                 choice = j / self.terrain_config.num_cols + 0.001
 
                 terrain = self.make_terrain(choice, difficulty)

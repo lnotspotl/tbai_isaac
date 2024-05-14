@@ -23,6 +23,7 @@ def play(args):
     config.environment.noise.add_noise = False
     config.environment.domain_randomization.randomize_friction = True
     config.environment.domain_randomization.push_robots = True
+    config.environment.terrain.curriculum = True
 
     # Set seed
     if "seed" not in config:
@@ -32,7 +33,7 @@ def play(args):
         seed = config["seed"]
         set_seed(seed)
 
-    env = LeggedRobot(config, args.headless, 3)
+    env = LeggedRobot(config, args.headless, 1)
     assert args.model is not None, "Model must be provided"
     model_path = os.path.join(args.log_dir, args.model)
 

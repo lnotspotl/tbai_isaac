@@ -56,6 +56,16 @@ RUN pip3 install --no-cache-dir pybind11
 RUN apt install python3-catkin-tools python3-catkin -y
 RUN source ${HOME}/.bashrc && cd ${HOME}/tbai_bindings && source /opt/ros/noetic/setup.bash && export CMAKE_PREFIX_PATH=$CMAKE_PREFIX_PATH:${HOME}/libtorch && rm -rf /home/tbai/tbai_bindings/src/tbai_bindings/dependencies/libtorch || true && ln -s ${HOME}/libtorch /home/tbai/tbai_bindings/src/tbai_bindings/dependencies/ &&catkin build tbai_bindings 
 
+RUN apt install -y ros-noetic-pybind11-catkin \
+    ros-noetic-grid-map-core ros-noetic-grid-map-msgs ros-noetic-grid-map-ros ros-noetic-grid-map-rviz-plugin \
+    libopencv-dev \
+    libeigen3-dev \
+    libgmp-dev \
+    libmpfr-dev \
+    libboost-all-dev \
+    ros-noetic-turtlebot3-gazebo ros-noetic-turtlebot3-teleop \
+    ros-noetic-ros-numpy
+
 # Source tbai_bindings
 RUN echo "source ${HOME}/tbai_bindings/devel/setup.bash" >> ${HOME}/.bashrc && source ${HOME}/.bashrc
 RUN echo "export HOME=${HOME}" >> ${HOME}/.bashrc && source ${HOME}/.bashrc
