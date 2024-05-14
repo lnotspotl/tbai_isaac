@@ -1,7 +1,7 @@
 import os
 import tbai_ocs2_interface
 
-from tbai_isaac.anymal_d.info import URDF_PATH, MPC_TASK_FILE, MPC_REFERENCE_FILE, MPC_GAIT_FILE
+from tbai_isaac.anymal_d.info import URDF_PATH, MPC_TASK_FILE, MPC_REFERENCE_FILE, MPC_GAIT_FILE, MPC_TASK_FOLDER
 
 
 def get_interface(num_envs, torch, rviz_visualize=False, num_threads=5):
@@ -12,8 +12,8 @@ def get_interface(num_envs, torch, rviz_visualize=False, num_threads=5):
     gait = "trot"
 
     ig = tbai_ocs2_interface.TbaiIsaacGymInterface(
-        task_file,
-        urdf_file,
+        MPC_TASK_FOLDER,
+        URDF_PATH,
         reference_file,
         gait_file,
         gait,
