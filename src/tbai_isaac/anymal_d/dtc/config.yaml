@@ -2,8 +2,8 @@ environment:
   name: anymal_d
   env:
     num_envs: 4096
-    num_observations: 179
-    num_privileged_observations: 191
+    num_observations: 167
+    num_privileged_observations: 179
     env_spacing: 3.0
     num_actions: 12
     episode_length_s: 20
@@ -38,14 +38,14 @@ environment:
     heading_command: false
     ranges:
       lin_vel_x:
-      - -0.5
-      - 0.5
-      lin_vel_y:
-      - -0.3
-      - 0.3
-      ang_vel_yaw:
-      - -0.6
+      - 0.59
       - 0.6
+      lin_vel_y:
+      - -0.0
+      - 0.0
+      ang_vel_yaw:
+      - -0.0
+      - 0.0
       heading:
       - -3.14
       - 3.14

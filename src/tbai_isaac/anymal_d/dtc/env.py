@@ -56,7 +56,7 @@ class LeggedRobot(BaseEnv):
         self.sampling_positions_local = None 
 
         self.step_counter = 0
-        self.noise_scale = float(1.0)
+        self.noise_scale = float(0.0)
 
         self.observation_managers: OrderedDict[str, ObservationManager] = OrderedDict()
 
@@ -67,7 +67,7 @@ class LeggedRobot(BaseEnv):
 
         self.sim_params = ac.get_sim_params(self.anymal_config)
         self.height_samples = None
-        self.debug_viz = False
+        self.debug_viz = True
         self.init_done = False
         self._parse_cfg()
 
@@ -289,8 +289,8 @@ class LeggedRobot(BaseEnv):
         self.bb[:, :] = torch.logical_and(
             torch.logical_not(self.tbai_ocs2_interface.get_desired_contacts()),
             torch.logical_and(
-                self.tbai_ocs2_interface.get_time_left_in_phase() <= 0.025,
-                self.tbai_ocs2_interface.get_time_left_in_phase() >= 0.0,
+                self.tbai_ocs2_interface.get_time_left_in_phase() <= self.dt,
+                self.tbai_ocs2_interface.get_time_left_in_phase() > 0.0,
             ),
         ).float()
 
@@ -478,8 +478,8 @@ class LeggedRobot(BaseEnv):
         ]
 
         for fp, dfp in zip(foot_positions, desired_foot_positions):
-            dx = fp[:, 0] - dfp[:, 0]
-            dy = fp[:, 1] - dfp[:, 1]
+            dx = dfp[:, 0] - fp[:, 0]
+            dy = dfp[:, 1] - fp[:, 1]
 
             a = torch.linspace(0, 1, 10).to(self.device)
             a = a.view(1, -1)
@@ -644,7 +644,7 @@ class LeggedRobot(BaseEnv):
             # RH foot position error
             rh_foot_position_noise = self.generate_uniform(size=(self.num_envs, 3), low=-0.06, high=0.06, device=self.device)
             rh_foot_pos_error = self.rh_foot_position - self.tbai_ocs2_interface.get_desired_foot_positions()[:, 9:12] 
-            # rh_foot_pos_error = quat_apply(quat_conjugate(self.base_quat), rh_foot_pos_error) # TODO: Add this, was not used during training
+            rh_foot_pos_error = quat_apply(quat_conjugate(self.base_quat), rh_foot_pos_error) # TODO: Add this, was not used during training
 
             # LF foot velocity error
             lf_foot_velocity_noise = self.generate_uniform(size=(self.num_envs, 3), low=-0.20, high=0.20, device=self.device)
@@ -673,15 +673,17 @@ class LeggedRobot(BaseEnv):
                     lh_foot_pos_error + lh_foot_position_noise * self.noise_scale,
                     rf_foot_pos_error + rf_foot_position_noise * self.noise_scale,
                     rh_foot_pos_error + rh_foot_position_noise * self.noise_scale,
-                    lf_foot_vel_error + lf_foot_velocity_noise * self.noise_scale,
-                    lh_foot_vel_error + lh_foot_velocity_noise * self.noise_scale,
-                    rf_foot_vel_error + rf_foot_velocity_noise * self.noise_scale,
-                    rh_foot_vel_error + rh_foot_velocity_noise * self.noise_scale,
+                    # lf_foot_vel_error + lf_foot_velocity_noise * self.noise_scale,
+                    # lh_foot_vel_error + lh_foot_velocity_noise * self.noise_scale,
+                    # rf_foot_vel_error + rf_foot_velocity_noise * self.noise_scale,
+                    # rh_foot_vel_error + rh_foot_velocity_noise * self.noise_scale,
                 ], dim=-1
             )
 
             if self.add_height_samples:
                 self.obs_buf = torch.cat([self.obs_buf, height_samples + height_samples_noise * self.noise_scale], dim=-1)
+
+        # assert self.obs_buf.shape[1] == 179
 
         # Privileged observation == without noise
         self.privileged_obs_buf = torch.cat(
@@ -717,10 +719,10 @@ class LeggedRobot(BaseEnv):
                     lh_foot_pos_error,
                     rf_foot_pos_error,
                     rh_foot_pos_error,
-                    lf_foot_vel_error,
-                    lh_foot_vel_error,
-                    rf_foot_vel_error,
-                    rh_foot_vel_error,
+                    # lf_foot_vel_error,
+                    # lh_foot_vel_error,
+                    # rf_foot_vel_error,
+                    # rh_foot_vel_error,
                 ], dim=-1
             )
 
@@ -1557,14 +1559,6 @@ class LeggedRobot(BaseEnv):
             for i in range(4):
                 desired_foothold = self.tbai_ocs2_interface.get_planar_footholds()[j, i * 2 : i * 2 + 2]
 
-                # temp = torch.zeros((1, 3), device=self.device)
-                # temp[0, 0:2] = self.tbai_ocs2_interface.get_planar_footholds()[0, i*2:i*2+2]
-                # temp[0, 0:2] -= self.root_states[0, 0:2]
-                # temp = quat_apply_yaw_inverse(self.base_quat[0].view(1, -1), temp)
-
-                # # planar_footholds[:, i*2:i*2+2] = temp[:, :2]
-                # desired_foothold = temp[0, :2]
-
                 if self.terrain_config.mesh_type != "plane":
 
                     desired_foothold = desired_foothold.cpu()
@@ -1925,6 +1919,8 @@ class LeggedRobot(BaseEnv):
         self.tracking_reward_ready *= 1.0 - apply_reward
 
         tt = torch.logical_and(self.aa, self.bb)
+
+        print(tt[0])
 
         lf_foot_positions = self.lf_foot_position[:, :2]
         lf_foot_positions_desired = self.tbai_ocs2_interface.get_planar_footholds()[:, 0:2]
