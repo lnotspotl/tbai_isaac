@@ -2,14 +2,14 @@ environment:
   name: anymal_d
   env:
     num_envs: 4096
-    num_observations: 139
-    num_privileged_observations: 151
+    num_observations: 167
+    num_privileged_observations: 179
     env_spacing: 3.0
     num_actions: 12
     episode_length_s: 20
     send_timeouts: true
   terrain:
-    mesh_type: plane
+    mesh_type: "trimesh"
     horizontal_scale: 0.1
     vertical_scale: 0.005
     border_size: 25
@@ -23,9 +23,9 @@ environment:
     num_rows: 10
     num_cols: 20
     terrain_proportions:
-    - 0.1
-    - 0.1
-    - 0.35
+    - 0.15
+    - 0.15
+    - 0.25
     - 0.25
     - 0.2
     slope_treshold: 0.75
@@ -38,14 +38,14 @@ environment:
     heading_command: false
     ranges:
       lin_vel_x:
-      - -0.51
-      - 0.51
+      - 0.59
+      - 0.6
       lin_vel_y:
-      - -0.3
-      - 0.3
+      - -0.0
+      - 0.0
       ang_vel_yaw:
-      - -0.5
-      - 0.5
+      - -0.0
+      - 0.0
       heading:
       - -3.14
       - 3.14
@@ -94,7 +94,7 @@ environment:
     - 7
     push_robots: true
     push_interval_s: 15
-    max_push_vel_xy: 1.0
+    max_push_vel_xy: 0.3
   sim:
     dt: 0.005
     substeps: 1
@@ -156,10 +156,10 @@ environment:
       tracking_ang_vel: 0.0
       lin_vel_z: -0.0
       exp_base_position: 3.0
-      exp_base_orientation: 1.0
+      exp_base_orientation: 2.0
       exp_base_linear_velocity: 2.0
       exp_base_angular_velocity: 1.0
-      exp_base_linear_acceleration: 1.0
+      exp_base_linear_acceleration: 2.0
       exp_base_angular_acceleration: 1.0
       foot_power: -0.3
       ang_vel_xy: 0.0
@@ -170,13 +170,13 @@ environment:
       base_height: 0.0
       feet_air_time: 1.0
       collision: -0.0
-      stumble: 0.0
+      stumble: -1.0
       action_rate: -0.02
       stand_still: 0.0
       smoothness: -0.0
-      swing_height: -0.003
+      swing_height: -0.000
       action_norm: -0.005
-      consistency: 30.0
+      consistency: 60.0
       foot_position_tracking: 2.0
       z_height: 10.0
       follow_joint_trajectory: -1.0

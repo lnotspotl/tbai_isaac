@@ -31,6 +31,9 @@ def train(args):
 
     coach = Coach(env, config, actor_critic, args.log_dir, writer_type=args.writer_type)
 
+    if args.model:
+        coach.load(args.model)
+
     coach.train(args.max_iterations, True)
 
 
