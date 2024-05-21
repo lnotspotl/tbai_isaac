@@ -50,14 +50,14 @@ class Terrain:
             (i, j) = np.unravel_index(k, (self.terrain_config.num_rows, self.terrain_config.num_cols))
 
             choice = np.random.uniform(0, 1)
-            difficulty = np.random.choice([0.001, 0.15, 0.25])
+            difficulty = np.random.choice([0.001, 0.05, 0.1, 0.15, 0.20, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5])
             terrain = self.make_terrain(choice, difficulty)
             self.add_terrain_to_map(terrain, i, j)
 
     def curiculum(self):
         for j in range(self.terrain_config.num_cols):
             for i in range(self.terrain_config.num_rows):
-                difficulty = 0.3 * i / self.terrain_config.num_rows
+                difficulty = 0.7 * i / self.terrain_config.num_rows
                 choice = j / self.terrain_config.num_cols + 0.001
 
                 terrain = self.make_terrain(choice, difficulty)
@@ -74,7 +74,7 @@ class Terrain:
         slope = difficulty * 0.4
         step_height = 0.05 + 0.18 * difficulty
         discrete_obstacles_height = 0.05 + difficulty * 0.2
-        stepping_stones_size = 1.5 * (1.05 - difficulty)
+        stepping_stones_size = 0.8 * (1.05 - difficulty)
         stone_distance = 0.05 if difficulty == 0 else 0.1
         gap_size = 1.0 * difficulty
         pit_depth = 1.0 * difficulty
