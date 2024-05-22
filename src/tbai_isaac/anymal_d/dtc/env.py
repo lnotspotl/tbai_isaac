@@ -447,7 +447,7 @@ class LeggedRobot(BaseEnv):
 
     def generate_uniform(self, size, low, high, device):
         diff = high - low
-        out = torch.randn(*size) * diff + low
+        out = torch.rand(*size) * diff + low
         return out.to(device)
     
 
