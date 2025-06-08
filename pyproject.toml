@@ -8,9 +8,6 @@ dependencies = [
     "rich"
 ]
 
-[options]
-package_dir="src"
-
 [project.optional-dependencies]
 dev = [
     "mypy",

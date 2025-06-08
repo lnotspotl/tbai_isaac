@@ -1,4 +1,6 @@
 #!/usr/bin/env python
 from setuptools import setup
 
-setup()
+setup(
+    packages=['tbai_isaac']
+)
