@@ -1,7 +1,7 @@
 [project]
 name="tbai_isaac"
 version="0.0.1"
-requires-python = ">=3.8"
+requires-python = ">=3.8,<3.9"
 dependencies = [
     "lxml",
     "omegaconf",
