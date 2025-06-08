@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 
-import tbai_isaac.anymal_d.perceptive.config as ac
-import tbai_isaac.anymal_d.perceptive.student as student
+import tbai_isaac.envs.anymal_d.blind.student_blind as student
 import torch
 import torch.nn as nn
 import torch.optim as optim
 import tqdm
-from tbai_isaac.anymal_d.common.noise_model import ExteroceptiveNoiseGenerator
-from tbai_isaac.anymal_d.perceptive.env import LeggedRobot
-from tbai_isaac.anymal_d.perceptive.student import StudentPolicy, StudentPolicyJitted
-from tbai_isaac.anymal_d.perceptive.teacher import TeacherNetwork
+from tbai_isaac.envs.anymal_d.blind.config import ac
+from tbai_isaac.envs.anymal_d.blind.student_blind import StudentPolicy, StudentPolicyJitted
+from tbai_isaac.envs.anymal_d.common.noise_model import ExteroceptiveNoiseGenerator
+from tbai_isaac.envs.anymal_d.perceptive.env import LeggedRobot
+from tbai_isaac.envs.anymal_d.perceptive.teacher import TeacherNetwork
 from tbai_isaac.common.config import load_config
 from tbai_isaac.common.utils import parse_args
 from tbai_isaac.ppo.coach import Coach
@@ -139,7 +139,7 @@ class Distiller:
             reconstruction_loss = nn.functional.mse_loss(reconstructed_student, reconstructed_target)
 
             # Calculate total loss
-            loss = action_loss + 0.5 * reconstruction_loss
+            loss = action_loss + 0.1 * reconstruction_loss
             loss_acum += loss
 
             self.writer.add_scalar("action_loss", action_loss.item(), i)
@@ -172,8 +172,8 @@ def distill(args):
     config.environment.env.num_envs = min(config.environment.env.num_envs, 4096)
     config.environment.terrain.curriculum = False
     config.environment.noise.add_noise = False
-    config.environment.domain_randomization.randomize_friction = True
-    config.environment.domain_randomization.push_robots = True
+    config.environment.domain_randomization.randomize_friction = False
+    config.environment.domain_randomization.push_robots = False
 
     env = LeggedRobot(config, args.headless)
 
@@ -190,7 +190,7 @@ def distill(args):
     distiller.distill()
 
     student_policy = StudentPolicyJitted(student)
-    student_policy.export("./logs/student_jitted.pt")
+    student_policy.export("./logs/student_jitted_blind2.pt")
 
 
 if __name__ == "__main__":

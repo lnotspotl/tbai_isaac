@@ -1,7 +1,7 @@
 import os
 import tbai_ocs2_interface
 
-from tbai_isaac.anymal_d.info import URDF_PATH, MPC_TASK_FILE, MPC_REFERENCE_FILE, MPC_GAIT_FILE, MPC_TASK_FOLDER
+from tbai_isaac.envs.anymal_d.info import URDF_PATH, MPC_TASK_FILE, MPC_REFERENCE_FILE, MPC_GAIT_FILE, MPC_TASK_FOLDER
 
 
 def get_interface(num_envs, torch, rviz_visualize=False, num_threads=5):

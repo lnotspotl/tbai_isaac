@@ -4,7 +4,7 @@ import argparse
 
 import torch
 import torch.nn as nn
-from tbai_isaac.anymal_d.dtc.agent import AgentNetwork
+from tbai_isaac.envs.anymal_d.dtc.agent import AgentNetwork
 
 from tbai_isaac.common.config import load_config
 

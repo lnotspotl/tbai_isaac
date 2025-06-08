@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 
 
-from tbai_isaac.anymal_d.perceptive.env import LeggedRobot
-from tbai_isaac.anymal_d.perceptive.teacher import TeacherNetwork
+from tbai_isaac.envs.anymal_d.perceptive.env import LeggedRobot
+from tbai_isaac.envs.anymal_d.perceptive.teacher import TeacherNetwork
 from tbai_isaac.common.config import load_config
 from tbai_isaac.common.utils import parse_args, create_dir
 from tbai_isaac.ppo.coach import Coach

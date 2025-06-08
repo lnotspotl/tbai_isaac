@@ -3,7 +3,7 @@
 import numpy as np
 from isaacgym import gymapi
 from omegaconf import OmegaConf
-from tbai_isaac.anymal_d.info import URDF_PATH
+from tbai_isaac.envs.anymal_d.info import URDF_PATH
 from tbai_isaac.common.config import select
 
 

@@ -3,8 +3,8 @@
 from ocs2_interface import get_interface
 from isaacgym import gymapi, gymtorch, gymutil
 import torch
-from tbai_isaac.anymal_d.dtc.agent import AgentNetwork
-from tbai_isaac.anymal_d.dtc.env import LeggedRobot
+from tbai_isaac.envs.anymal_d.dtc.agent import AgentNetwork
+from tbai_isaac.envs.anymal_d.dtc.env import LeggedRobot
 from tbai_isaac.common.config import load_config
 from tbai_isaac.common.utils import parse_args
 from tbai_isaac.ppo.coach import Coach
