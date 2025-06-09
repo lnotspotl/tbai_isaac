@@ -72,7 +72,7 @@ class Terrain:
             horizontal_scale=self.terrain_config.horizontal_scale,
         )
         slope = difficulty * 0.4
-        step_height = 0.05 + 0.18 * difficulty
+        step_height = 0.05 + self.terrain_config.step_height_multiplier * difficulty
         discrete_obstacles_height = 0.05 + difficulty * 0.2
         stepping_stones_size = 0.8 * (1.05 - difficulty)
         stone_distance = 0.05 if difficulty == 0 else 0.1

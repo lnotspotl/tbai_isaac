@@ -22,6 +22,7 @@ environment:
     terrain_width: 8
     num_rows: 10
     num_cols: 20
+    step_height_multiplier: 0.18
     terrain_proportions:
     - 0.15
     - 0.15
