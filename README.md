@@ -6,7 +6,7 @@ You should install [Isaac Gym](https://developer.nvidia.com/isaac-gym) prior to 
 
 ## Install `tbai_isaac`
 ```bash
-git clone https://github.com/lnotspotl/tbai_isaac.git && cd tbai_isaac
+git clone https://github.com/tbai-lab/tbai_isaac.git && cd tbai_isaac
 pip3 install -e .
 ```
 
